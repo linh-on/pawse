@@ -1,0 +1,1202 @@
+[
+  {
+    "text": "FRAUD ALERT: A purchase of $847.00 at an unknown merchant was just attempted on your card. Tap to review.",
+    "label": "urgent"
+  },
+  {
+    "text": "ALERT: We detected a sign-in to your Google account from a new device in Kyiv, Ukraine. Not you? Secure your account now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Mom: Call me RIGHT NOW. It's about Dad. Please.",
+    "label": "urgent"
+  },
+  {
+    "text": "EMERGENCY ALERT: Flash flood warning issued for your area until 9:00 PM. Move to higher ground immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your password was changed. If you didn't do this, reset your account immediately at chase.com/security.",
+    "label": "urgent"
+  },
+  {
+    "text": "Low battery: 5% remaining. Connect to a charger now or your device will shut down.",
+    "label": "urgent"
+  },
+  {
+    "text": "AMBER Alert: Black Honda Civic, plate 7TRK449, last seen on I-5 North. Suspect armed.",
+    "label": "urgent"
+  },
+  {
+    "text": "Bank of America: Your checking account balance has dropped below $10.00. Overdraft risk.",
+    "label": "urgent"
+  },
+  {
+    "text": "911 text \u2014 James: I think I'm having a heart attack. Home alone. 4821 Maple St.",
+    "label": "urgent"
+  },
+  {
+    "text": "Server down: api.production.yourapp.com has been unreachable for 5 minutes. 3 monitors failing.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your Uber is 1 minute away and the driver is waiting. Tap to confirm you're coming.",
+    "label": "urgent"
+  },
+  {
+    "text": "COVID Test Result Available: Action required \u2014 log in to view your result before your flight tomorrow.",
+    "label": "urgent"
+  },
+  {
+    "text": "Chase: A wire transfer of $2,400 was initiated from your account. Tap to verify or cancel.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your package containing insulin was returned to the facility. Reschedule delivery immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "CRITICAL: Storage 100% full. Your phone cannot receive calls or messages until space is freed.",
+    "label": "urgent"
+  },
+  {
+    "text": "[Work] Deployment failed: Production build #441 crashed. All hands on Slack NOW.",
+    "label": "urgent"
+  },
+  {
+    "text": "TORNADO WARNING: Take shelter immediately. Tornado sighted 3 miles from your location.",
+    "label": "urgent"
+  },
+  {
+    "text": "Venmo: Someone just sent a payment request for $320.00. Unusual? Review now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Dr. Patel's office: Your surgery is scheduled for 7 AM tomorrow. Please call to confirm or we must give your slot away.",
+    "label": "urgent"
+  },
+  {
+    "text": "Apple ID locked: Too many failed sign-in attempts. Verify your identity to restore access.",
+    "label": "urgent"
+  },
+  {
+    "text": "Fire detected: Nest Protect in Kitchen is sensing smoke. Check your home immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Contract expires in 1 hour: The NDA you need to sign closes at 5:00 PM. Open DocuSign now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your flight AA2341 departs in 45 minutes. You have not checked in. Check in immediately or your seat may be released.",
+    "label": "urgent"
+  },
+  {
+    "text": "Ring: Motion detected at your front door while you're away. Live view available.",
+    "label": "urgent"
+  },
+  {
+    "text": "SOS from Sarah's iPhone: Sarah may be in danger. Her location is shared with you.",
+    "label": "urgent"
+  },
+  {
+    "text": "Water leak detected: SmartThings sensor under kitchen sink is wet. Turn off water supply.",
+    "label": "urgent"
+  },
+  {
+    "text": "Robinhood: Your stop-loss order was triggered. TSLA dropped 18% \u2014 portfolio action needed.",
+    "label": "urgent"
+  },
+  {
+    "text": "Zoom: Your interview starts in 5 minutes and the host is waiting in the room.",
+    "label": "urgent"
+  },
+  {
+    "text": "Data breach: Your email was found in a recent breach. Change your passwords immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Instagram: Someone logged into your account from an iPhone in Brazil. Secure your account.",
+    "label": "urgent"
+  },
+  {
+    "text": "URGENT \u2014 HR: Your benefits enrollment closes tonight at midnight. Unenrolled employees get no coverage.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your car's traction control system has failed. Pull over safely and contact roadside assistance.",
+    "label": "urgent"
+  },
+  {
+    "text": "PayPal: A $1,500 payment to an unrecognized account is pending. Cancel within 10 minutes.",
+    "label": "urgent"
+  },
+  {
+    "text": "Glucose alert: Your CGM reads 48 mg/dL. Dangerously low \u2014 eat fast-acting carbs immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Jake (unknown number): I got in a car accident. I'm at County General. Please come.",
+    "label": "urgent"
+  },
+  {
+    "text": "Authenticator: A login code was generated that you didn't request. Secure your accounts now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your domain yourbusiness.com expires in 24 hours. Renew now to avoid losing it.",
+    "label": "urgent"
+  },
+  {
+    "text": "Gas leak suspected: Your Arlo sensor detected abnormal air quality. Evacuate and call 911.",
+    "label": "urgent"
+  },
+  {
+    "text": "Slack (CEO): All-hands call in 10 minutes \u2014 company-wide announcement. Do not miss this.",
+    "label": "urgent"
+  },
+  {
+    "text": "Court reminder: You have jury duty tomorrow at 8 AM. Failure to appear may result in a fine.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your child's school: Lockdown in effect. No pickup until cleared. Monitor this channel for updates.",
+    "label": "urgent"
+  },
+  {
+    "text": "Network intrusion detected on your home router. An unknown device is accessing your network.",
+    "label": "urgent"
+  },
+  {
+    "text": "IRS Notice: Final notice before levy. Call 1-800-xxx-xxxx to avoid wage garnishment.",
+    "label": "urgent"
+  },
+  {
+    "text": "Wallet: Your Apple Card is suspended due to suspicious activity. Tap to resolve.",
+    "label": "urgent"
+  },
+  {
+    "text": "High heart rate detected: Apple Watch recorded 178 BPM while you appeared to be inactive.",
+    "label": "urgent"
+  },
+  {
+    "text": "Medication reminder: You missed your 8 PM dose of Metformin. Take it now or skip per your doctor's advice.",
+    "label": "urgent"
+  },
+  {
+    "text": "Lyft: Your driver just canceled. You have a flight in 40 minutes. Rebook now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your GitHub repo was made public accidentally. It contains API keys \u2014 revoke them immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "EVICTION NOTICE: Rent 30 days overdue. Pay by 5 PM today or vacate proceedings begin.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your identity may have been stolen: A new credit account was opened in your name today.",
+    "label": "urgent"
+  },
+  {
+    "text": "Power outage detected in your neighborhood. Estimated restoration: unknown.",
+    "label": "urgent"
+  },
+  {
+    "text": "Critical app update required: A security vulnerability in your banking app must be patched now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Blood pressure alert: Your reading of 185/112 is dangerously high. Seek medical attention.",
+    "label": "urgent"
+  },
+  {
+    "text": "ICE ROAD WARNING: I-90 is closed due to black ice. Multiple accidents. Find alternate route now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Lost device alert: Your AirTag shows your luggage is moving without you at LAX.",
+    "label": "urgent"
+  },
+  {
+    "text": "Final boarding call: Gate B12 closes in 3 minutes for flight UA980.",
+    "label": "urgent"
+  },
+  {
+    "text": "Dad's Life Alert: Your father has pressed his emergency button. Responders notified.",
+    "label": "urgent"
+  },
+  {
+    "text": "RANSOMWARE DETECTED: Your files are being encrypted. Disconnect from the internet immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Amber: Where are you?? It's 2 AM and I'm panicking. Please respond.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your car registration expires TODAY. Drive unregistered and risk a fine.",
+    "label": "urgent"
+  },
+  {
+    "text": "Two-factor code: 847291 \u2014 This code was requested from an unknown device. Do not share it.",
+    "label": "urgent"
+  },
+  {
+    "text": "System Alert: RAM usage at 98%. Your device will restart in 60 seconds to prevent data loss.",
+    "label": "urgent"
+  },
+  {
+    "text": "Coinbase: Your account has been disabled due to suspicious login attempts.",
+    "label": "urgent"
+  },
+  {
+    "text": "Allergen alert: Your EpiPen was last used 3 days ago. Refill your prescription now \u2014 0 remaining.",
+    "label": "urgent"
+  },
+  {
+    "text": "Severe thunderstorm warning: 70mph winds and quarter-size hail expected in your zip code in 15 minutes.",
+    "label": "urgent"
+  },
+  {
+    "text": "Wire transfer received: $0.01 \u2014 This is a recon deposit. Someone may be testing your account. Contact your bank.",
+    "label": "urgent"
+  },
+  {
+    "text": "Hinge: Emma liked your profile and sent a message.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Your DoorDash order is being prepared. Estimated delivery: 28\u201338 minutes.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Amazon: Your package has been delivered to your front door. Photo attached.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "NYT: 'What We're Reading This Weekend' \u2014 5 books our journalists recommend this summer.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Spotify: New album from Taylor Swift \u2014 'The Tortured Poets Department' is now available. Listen now.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Duolingo: You're on a 14-day streak! Don't break it \u2014 do today's lesson.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "LinkedIn: You appeared in 24 searches this week. See who's looking at your profile.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Nike: Your order shipped! Estimated arrival Thursday. Track your package.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Reddit: u/throwaway_7821 replied to your comment in r/personalfinance.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Google Photos: Your memories from 3 years ago are ready. Take a look.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Apple News: 5 things to know today \u2014 housing prices, tech layoffs, and World Cup qualifiers.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Starbucks: Your order is ready for pickup at the downtown location.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Instagram: @sofia_travels mentioned you in a story.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "YouTube: MrBeast uploaded a new video: 'I Survived 100 Days on a Deserted Island'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Calendar: Dentist appointment tomorrow at 10:30 AM \u2014 Riverside Dental Clinic.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Twitter/X: Your tweet got 148 likes and 31 retweets. See the conversation.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Best Buy: Flash sale \u2014 AirPods Pro 2nd Gen now $189. Today only.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Fitbit: You hit your 10,000 step goal! Great job staying active today.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Discord: Jake pinged you in #general \u2014 'yo who's free to game tonight?'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Headspace: Your calm streak is at 5 days. Meditate for 10 minutes before bed tonight.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "USPS: Your package from Etsy is out for delivery today.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Sam's Club: Your membership renewal is coming up. Renew online and save $10.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "WhatsApp: Marcus shared a YouTube link in 'College Friends \ud83c\udf93'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Yelp: You visited Nobu last week! Leave a review and help others decide.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "ESPN: Final score \u2014 Lakers 114, Celtics 108. LeBron dropped 34 points.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Duolingo: Owen challenged you to beat his Spanish score. Accept?",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Snapchat: Mia sent you a snap \ud83d\udc40",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Airbnb: Your host left you a 5-star review! Check it out.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Gmail: 'Re: Design feedback' \u2014 Priya replied to your email thread.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Your sleep report is ready: 7h 14m last night. Sleep score: 82. Good job!",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Nextdoor: 3 new posts in your neighborhood \u2014 lost cat, garage sale, and road closures.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Etsy: Your handmade ceramic mug shipped today! Track order.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Venmo: Ryan paid you $12.50 for pizza \ud83c\udf55",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Calm: Tonight's Sleep Story with Matthew McConaughey is now available. Sweet dreams.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Pinterest: 5 new pins added to boards you follow \u2014 'Minimalist Interiors'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Amazon Prime: Don't forget \u2014 you have 3 unwatched episodes of The Boys in your watchlist.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Slack: Lisa left a \ud83d\udc4d on your message in #design-feedback.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Weather: Tomorrow will be sunny and 72\u00b0F \u2014 great day for a walk.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Target Circle: You earned $4.80 in rewards from your last purchase.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Groupon: Today's deal: 50% off at a local spa \u2014 only 11 left!",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Gmail (newsletter): 'Your weekly digest from Medium \u2014 top stories in tech and design'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "TikTok: @dancewithjenny posted a new video you might like.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Audible: 'Atomic Habits' chapter 4 is ready to continue where you left off.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Robinhood: AAPL is up 3.2% today. Your portfolio gained $41.20.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Google Maps: Based on traffic, leave in 20 minutes to reach the airport on time.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Peloton: New live class starting in 15 minutes \u2014 'Power Zone Endurance Ride' with Denis.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "iMessage: Mom forwarded you a recipe for banana bread \ud83c\udf4c",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Airbnb: Check-in reminder \u2014 Your stay in Portland begins in 2 days. Review your host's house rules.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Kindle: You're 67% through 'The Midnight Library'. Pick up where you left off.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Poshmark: Your item sold! 'Levi's 501 Jeans' \u2014 $45. Print shipping label.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Facebook: David tagged you in a photo from 'Mark's Birthday BBQ \ud83c\udf89'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Grubhub: Promo code SAVE20 is expiring tonight. Use it on your next order.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Apple Fitness+: You closed all 3 rings today. Perfect activity day! \ud83d\udcaa",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Todoist: You have 3 tasks due this week. 'Finish quarterly report' is highest priority.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Waze: There's a 12-minute delay on your usual route home. Alternate route suggested.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Substack: New post from your favorite newsletter: 'Why Boredom Is Good for Creativity'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Cash App: You received $25.00 from Tyler. 'dinner last week!'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Spotify: Your 'Discover Weekly' playlist has been updated with 30 new songs.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "BeReal: Time to BeReal! Your friends have posted \u2014 4h 23m left.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Strava: Congrats! You just set a new personal record on the Riverside Loop segment.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "iMessage: Alex: 'Are we still on for Saturday? Let me know!'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "App Store: An update is available for 7 of your apps including Maps, Photos, and Safari.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "National Geographic: 'Scientists Just Found a New Species of Deep Sea Fish \u2014 See the Photos'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Gmail: 'Your Netflix receipt for $15.49 \u2014 April 2024'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Noom: Weekly check-in: You lost 0.8 lbs this week. You're trending in the right direction!",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Chipotle: Your burrito bowl is ready for pickup at the Figueroa St. location.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Twitter/X: 'Elon Musk' is trending. 1.4M tweets \u2014 see what's happening.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Tinder: You matched with someone new! Start the conversation.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Chase: Your monthly statement is ready. Balance due: $423.17 on May 12.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Goodreads: Your friend Kevin just finished 'Dune' and gave it 5 stars.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Walgreens: Your prescription is ready for pickup. Expires in 7 days.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "The Washington Post: 'Here's What Congress Voted On This Week \u2014 A Quick Summary'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Notion: Your teammate Jess left a comment on 'Q2 Roadmap \u2014 Marketing'. Check it out.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Uber Eats: Flash deal: Free delivery on your next order from Sweetgreen. Offer expires in 2 hours.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Wordle: Today's Wordle is live. Can you keep your streak going? Currently at 41 days.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "MyFitnessPal: You're 240 calories under your goal today. Nice work staying on track.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Hulu: 'Only Murders in the Building' Season 4 just dropped. Start watching now.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Google Calendar: 'Coffee with Natalie' is tomorrow at 11 AM at Blue Bottle Coffee.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "OfferUp: Someone messaged you about the couch you listed: 'Is this still available?'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Morning Brew: Good morning! Here's your 5-minute business news briefing for Wednesday.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Lose It!: You're close to your weekly exercise goal \u2014 just 1 more workout to go!",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Amazon: Items in your cart are going fast \u2014 2 left in stock. Complete your purchase.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "IMDb: The Oscars are this Sunday. See the full nominees list and make your predictions.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Google Pay: You split the dinner bill with 4 friends. $38.20 request sent to each.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Meetup: 'Python Devs of LA' has a new event: Intro to FastAPI \u2014 RSVP closes Friday.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "ClassPass: You have 2 credits expiring at end of month. Book a class before they disappear.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Gmail: 'Your Airbnb receipt \u2014 $328.50 for Portland, OR, May 3\u20135'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Craigslist: Someone replied to your 'Free couch \u2014 must pick up' listing.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "LinkedIn: Congratulate Alex on his 1-year work anniversary at Google!",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Shazam: 'Redbone' by Childish Gambino matched a song you just heard. Save it to Spotify?",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Allrecipes: You saved 'One-Pan Lemon Garlic Chicken'. Ready to cook tonight?",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Horoscope+: Aries today: Step outside your comfort zone \u2014 a new opportunity awaits.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Snapchat: Your memory 'Trip to Cabo \ud83c\udf0a' from 1 year ago just resurfaced.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Google: Your flight SFO\u2192JFK lands at 11:40 PM tomorrow. Check current status.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "CNET: 'The Best Laptops Under $1,000 in 2024 \u2014 Updated for Spring'.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Zillow: 3 new homes match your saved search in the 90210 zip code.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Gmail: 'Thinking of you' \u2014 A handwritten card from Grandma was sent digitally via Touchnote.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Foursquare: 3 friends checked in nearby at The Blue Owl Tavern tonight.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Peacock: 'The Office' marathon starts tonight at 8 PM. Set a reminder.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "iMessage: Roommate: 'FYI I bought more dish soap, you can venmo me $3 whenever'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "CRITICAL: Your two-factor authentication was disabled on your Microsoft account. Re-enable it immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Severe allergic reaction: EpiPen administered to your child at school. Please come to the office immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your cloud backup has failed for 14 days. You have no recoverable backup on file.",
+    "label": "urgent"
+  },
+  {
+    "text": "Bank alert: Your debit card was just used at an ATM in Miami for 00. Was this you?",
+    "label": "urgent"
+  },
+  {
+    "text": "Hurricane watch: Category 3 storm projected to make landfall near you in 18 hours. Prepare evacuation now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Tesla: Brake system fault detected. Pull over safely and contact Tesla Roadside immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your AWS bill this month is ,218 \u2014 900% over normal. A misconfigured service may be running.",
+    "label": "urgent"
+  },
+  {
+    "text": "Unknown device connected to your home WiFi. Network access enabled \u2014 review now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Missing person alert: 9-year-old girl last seen in Riverside Park at 4 PM. Call 911 with any info.",
+    "label": "urgent"
+  },
+  {
+    "text": "Emergency contact \u2014 Jamie: I've been in an accident. At St. Mary's Hospital. Please call ASAP.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your Stripe account has been suspended due to a chargeback rate exceeding 1%. Payments halted.",
+    "label": "urgent"
+  },
+  {
+    "text": "Software alert: Your antivirus has expired. Malware was blocked earlier today \u2014 renew protection now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Landlord: Water shutoff for the entire building tomorrow 8 AM\u20135 PM. Fill containers tonight.",
+    "label": "urgent"
+  },
+  {
+    "text": "Carbon monoxide alarm: High CO levels detected in your home. Evacuate and call 911.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your PayPal account is limited. You can't send or withdraw funds until you verify your identity.",
+    "label": "urgent"
+  },
+  {
+    "text": "Google: Critical security alert \u2014 an app you authorized is accessing all your Gmail. Revoke access now.",
+    "label": "urgent"
+  },
+  {
+    "text": "IRS: Your 2023 tax return has been flagged for review. A response is required within 30 days.",
+    "label": "urgent"
+  },
+  {
+    "text": "Child safety: Your child's location sharing stopped 2 hours ago. Last seen near Central Ave.",
+    "label": "urgent"
+  },
+  {
+    "text": "Power outage alert: Your home security system is running on backup battery \u2014 4 hours remaining.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your prescription Adderall refill was denied. Contact your prescriber immediately \u2014 last pill today.",
+    "label": "urgent"
+  },
+  {
+    "text": "Zoom: Your license expired. All paid features are suspended, including meetings over 40 minutes.",
+    "label": "urgent"
+  },
+  {
+    "text": "Delta: Your flight was canceled due to weather. Rebook now \u2014 seats on alternate flights are limited.",
+    "label": "urgent"
+  },
+  {
+    "text": "VPN breach: Your private IP was exposed for 22 minutes. Change credentials and check for leaks.",
+    "label": "urgent"
+  },
+  {
+    "text": "Attorney reminder: Your court filing deadline is today at 4:30 PM. Documents not yet submitted.",
+    "label": "urgent"
+  },
+  {
+    "text": "Package alert: FedEx driver attempted delivery of a time-sensitive medical shipment. Schedule redelivery immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your student loan grace period ends in 48 hours. Set up payment to avoid default.",
+    "label": "urgent"
+  },
+  {
+    "text": "Google Workspace: Your account storage is completely full. Email delivery is now failing.",
+    "label": "urgent"
+  },
+  {
+    "text": "Unresponsive contact: Check-in app reports your elderly mother has not responded to the daily check-in.",
+    "label": "urgent"
+  },
+  {
+    "text": "App crash report: Your production app has a 47% crash rate in the last 30 minutes. Users affected: 12,000.",
+    "label": "urgent"
+  },
+  {
+    "text": "SIM swap detected: Your phone number was transferred to another carrier without your request. Call your carrier now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Custody reminder: Court order requires you to return the children by 6 PM today. Non-compliance is a violation.",
+    "label": "urgent"
+  },
+  {
+    "text": "Health app: Irregular heart rhythm detected over the last 15 minutes. Consider contacting your doctor.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your Shopify store went offline 34 minutes ago. Customers cannot checkout. Check your hosting.",
+    "label": "urgent"
+  },
+  {
+    "text": "REAL ID deadline: Your flight tomorrow requires REAL ID or passport. Your current license is not compliant.",
+    "label": "urgent"
+  },
+  {
+    "text": "Incoming call from Mom \u2014 tap to answer.",
+    "label": "urgent"
+  },
+  {
+    "text": "Missed call from Dad (2). Call back when you can.",
+    "label": "urgent"
+  },
+  {
+    "text": "Missed call from Sarah \u2014 she called twice in a row.",
+    "label": "urgent"
+  },
+  {
+    "text": "Incoming call from Brother \u2014 ringing now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Missed call from Grandma. No voicemail left.",
+    "label": "urgent"
+  },
+  {
+    "text": "Missed call from Jake (3 missed calls in 10 min).",
+    "label": "urgent"
+  },
+  {
+    "text": "Incoming call from wife \u2014 tap to answer or decline.",
+    "label": "urgent"
+  },
+  {
+    "text": "Missed call from Emergency Contact: Lisa.",
+    "label": "urgent"
+  },
+  {
+    "text": "Missed call from +1 (877) 204-9811. Likely spam.",
+    "label": "urgent"
+  },
+  {
+    "text": "Incoming call from Unknown Number.",
+    "label": "urgent"
+  },
+  {
+    "text": "Missed call from No Caller ID.",
+    "label": "urgent"
+  },
+  {
+    "text": "Incoming call from +44 7700 900123 \u2014 international, unknown.",
+    "label": "urgent"
+  },
+  {
+    "text": "FedEx: Delivery attempt failed \u2014 no one home. Reschedule or your package will be returned.",
+    "label": "urgent"
+  },
+  {
+    "text": "UPS: We couldn't deliver your package. Pick up by Friday or it will be sent back to sender.",
+    "label": "urgent"
+  },
+  {
+    "text": "Delivery failed: Package requires a signature. Final attempt tomorrow \u2014 reschedule now.",
+    "label": "urgent"
+  },
+  {
+    "text": "USPS: Delivery of your parcel was unsuccessful. Last pickup window: today by 6 PM.",
+    "label": "urgent"
+  },
+  {
+    "text": "Amazon: Your delivery was attempted but the access code was incorrect. Resolve now to avoid return.",
+    "label": "urgent"
+  },
+  {
+    "text": "Battery at 9% \u2014 connect to a charger soon or your phone will shut off.",
+    "label": "urgent"
+  },
+  {
+    "text": "Low battery: 6% remaining. Please charge your device.",
+    "label": "urgent"
+  },
+  {
+    "text": "Warning: Battery critically low at 3%. Saving battery mode enabled.",
+    "label": "urgent"
+  },
+  {
+    "text": "Battery is at 12%. Your alarm may not go off if the phone dies overnight.",
+    "label": "urgent"
+  },
+  {
+    "text": "Battery at 14% \u2014 plug in soon to keep notifications and calls active.",
+    "label": "urgent"
+  },
+  {
+    "text": "Starting in 10 minutes: Standup with engineering at 10:00 AM.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your meeting 'Interview \u2014 Senior Engineer' begins in 5 minutes. Join now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Reminder: Doctor's appointment in 15 minutes. Clinic is 10 min away.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your flight boards in 12 minutes at Gate C4. Head there now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Zoom call starts in 8 minutes \u2014 'Client Presentation Q2'. Don't be late.",
+    "label": "urgent"
+  },
+  {
+    "text": "BREAKING: Major earthquake \u2014 7.1 magnitude \u2014 strikes downtown Los Angeles. Casualties reported.",
+    "label": "urgent"
+  },
+  {
+    "text": "BREAKING NEWS: Active shooter reported near downtown. Police on scene. Avoid the area.",
+    "label": "urgent"
+  },
+  {
+    "text": "BREAKING: National emergency declared. President addressing the nation at 8 PM ET.",
+    "label": "urgent"
+  },
+  {
+    "text": "ALERT: CNN Breaking \u2014 Bridge collapse reported on I-35. Multiple vehicles involved. Avoid area.",
+    "label": "urgent"
+  },
+  {
+    "text": "BBC Breaking: Explosion reported in city center. Authorities evacuating a one-mile radius.",
+    "label": "urgent"
+  },
+  {
+    "text": "Security alert: New sign-in to your Amazon account from Windows PC in Chicago, IL.",
+    "label": "urgent"
+  },
+  {
+    "text": "Suspicious login attempt blocked on your Dropbox account. Was this you?",
+    "label": "urgent"
+  },
+  {
+    "text": "Your Twitter account was logged into from a device in S\u00e3o Paulo. Secure your account now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Alert: Multiple failed login attempts detected on your account. Tap to review.",
+    "label": "urgent"
+  },
+  {
+    "text": "Unusual activity: Your LinkedIn account was accessed from an unrecognized browser in Vietnam.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your Gmail password was changed 2 minutes ago. If this wasn't you, recover your account immediately.",
+    "label": "urgent"
+  },
+  {
+    "text": "Account update: The password for your Apple ID was just changed.",
+    "label": "urgent"
+  },
+  {
+    "text": "Instagram: Your password was recently changed. Didn't do this? Secure your account.",
+    "label": "urgent"
+  },
+  {
+    "text": "Alert: Your bank account PIN was changed today. Contact us immediately if this wasn't you.",
+    "label": "urgent"
+  },
+  {
+    "text": "Password changed: Your Netflix password was updated. Review account activity now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Storage almost full: Only 312 MB remaining (2% free). Free up space now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Storage full: 0 bytes available. Camera, apps, and messages may stop working.",
+    "label": "urgent"
+  },
+  {
+    "text": "Warning: Internal storage at 97% capacity. Delete files to avoid disruptions.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your phone storage is critically low \u2014 4% remaining. Clear space or move files to cloud.",
+    "label": "urgent"
+  },
+  {
+    "text": "\u23f0 Alarm: Wake up! Your 6:30 AM alarm is going off now.",
+    "label": "urgent"
+  },
+  {
+    "text": "Alarm ringing: 'Morning Run' \u2014 5:45 AM. Snooze or dismiss.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your alarm 'Take medication' is ringing. Tap to dismiss.",
+    "label": "urgent"
+  },
+  {
+    "text": "Alarm going off: 'Pick up kids from school' \u2014 3:00 PM.",
+    "label": "urgent"
+  },
+  {
+    "text": "Your Amazon package was delivered to your front door at 2:14 PM.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Delivered: Your order from Chewy arrived. Photo left at door.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "UPS: Package delivered and signed for at 11:32 AM today.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Your Nike order has shipped! Estimated arrival: Thursday, May 9.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "USPS: Your package is on its way. Expected delivery: tomorrow by 8 PM.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "FedEx: Your shipment is out for delivery today. No signature required.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Your DoorDash order is on its way \u2014 driver is 6 minutes away.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Heads up: Your Etsy order is on the way. Tracking number added.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Order confirmed: #114-8823901. Your AirPods will ship in 1\u20132 days.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Thanks for your order! Receipt for $62.40 sent to your email.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Your Chipotle order is confirmed. Pickup ready in ~12 minutes.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Uber Eats: Order placed at Shake Shack. Estimated delivery: 35 min.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Payment received \u2014 your Ticketmaster order for 2x GA tickets is confirmed.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Receipt: You paid $14.99 to Netflix. Thank you for your subscription.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Battery at 32% \u2014 you have several hours of use remaining.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Battery is at 45%. You're good for now.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Battery level: 61%. No action needed.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Low Power Mode disabled \u2014 battery back above 30%.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Calendar: Team offsite \u2014 next Monday, June 3 at 9 AM. Added to your calendar.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Reminder: Mom's birthday is in 2 weeks \u2014 don't forget to order a gift.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Calendar: Annual performance review scheduled for April 30 at 2 PM.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Upcoming: Dentist appointment on Thursday, May 16 at 10:30 AM.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Event in 3 days: 'Product Launch Planning' \u2014 Wednesday at 1 PM.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "@kevin_official liked your photo.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "5 people liked your post: 'Sunset from the rooftop \ud83c\udf05'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "taylorswift13 and 14 others liked your comment.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "@nomadtraveler left a comment on your reel: 'This is stunning!'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "You have a new follower: @realhikelife. They also follow 12 of your friends.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Reddit: Your post got 142 upvotes in r/mildlyinteresting.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Twitter: 18 people retweeted your tweet about morning routines.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "@bestfriend tagged you in a photo: 'Squad goals \ud83d\ude02'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Marcus tagged you in a post: 'Throwback to last summer \ud83c\udfd6\ufe0f'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "You've been tagged in a memory by Olivia \u2014 'Two years ago today!'",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Instagram: jenna.rose tagged you in a story. Tap to see before it expires.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Your Morning Briefing: Top 5 stories to start your Wednesday \u2014 politics, tech, and sports.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "The Daily Digest: Here's what happened in the world while you slept.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Newsletter: 'Why Remote Work Is Making a Comeback in 2024' \u2014 from The Atlantic.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "NPR: This week's top stories, curated for you. Tap to read.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Your Evening Wrap-Up from AP News \u2014 6 stories to know tonight.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Flash sale: 40% off sitewide at Lululemon \u2014 today only. Shop now.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Amazon: Your wishlist item dropped in price \u2014 Kindle Paperwhite now $99 (was $139).",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Promo: Buy one, get one free at Subway this weekend only.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Black Friday Preview: Early access to deals starts tonight at midnight.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "You have $15 in rewards expiring this month. Use them before they're gone.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Update available: Chrome 124.0 \u2014 bug fixes and performance improvements. Install when ready.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "App update: Instagram 318.0 is available. New features in Reels and Stories.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "System update available: Android 15 is ready to install tonight while charging.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "7 apps updated automatically overnight, including Maps, YouTube, and Gmail.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Spotify update ready: Version 8.9 includes improved offline playback. Update now or later.",
+    "label": "non_urgent"
+  },
+  {
+    "text": "Reminder: Call the dentist to reschedule your appointment \u2014 set for later today at 4 PM.",
+    "label": "non_urgent"
+  }
+]
