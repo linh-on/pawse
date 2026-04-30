@@ -10,12 +10,18 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Header from "../components/Header";
-import { colors, spacing, radii, shadows, typography } from "../theme";
+import {
+  colors,
+  spacing,
+  radii,
+  shadows,
+  typography,
+  patterns,
+} from "../theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const WEEK_DATA = [0.6, 0.4, 0.8, 0.5, 0.9, 0.3, 0.7];
 
-// Heatmap intensity per cell (0-3)
 const GRID = [
   [1, 2, 0, 1, 3, 2, 1],
   [2, 3, 2, 1, 2, 3, 2],
@@ -40,23 +46,59 @@ const REWARDS = [
 const MASCOT =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAFb7jjkY7NC_rkg3sSsGcNFn_sR9nbvDa0TNzK5TxPChSaCiPu-whKcwwYnarqWvGT2ugbEnmENbhqq7nC0PbNLUy7JnOBtcL8tgo4wH1AuTgI4C6Qtx280aMVHmlbwYDTCBJ7Z_OpC6kuI0fwt3Wm7tQMSdQckNWj9LkEoUBNMGoa-za19rKhTEwV-5A2gSPy1SuuHczBGQ-5uuSJImUrzvjDSm9wwCtb4UCC3dH9udT_9RJAH_pcH7CB3QmKWW3kArkr_DHxO3Ci";
 
+function cellColor(intensity) {
+  return [
+    `${colors.primary}10`,
+    `${colors.primaryContainer}80`,
+    colors.primaryContainer,
+    colors.primary,
+  ][intensity];
+}
+
 const StatsScreen = () => {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState("stats");
 
   return (
-    <View style={styles.screen}>
+    <View style={patterns.screen}>
       <Header />
 
       <ScrollView
         contentContainerStyle={[
-          styles.scroll,
+          patterns.scrollContent,
           { paddingBottom: 120 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top row */}
-        <View style={styles.topRow}>
+        {/* Tabs */}
+        <View style={[styles.tabs, shadows.card]}>
+          <TouchableOpacity
+            style={[styles.tab, tab === "stats" && styles.tabActive]}
+            onPress={() => setTab("stats")}
+          >
+            <Text
+              style={[styles.tabText, tab === "stats" && styles.tabTextActive]}
+            >
+              Stats
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, tab === "rewards" && styles.tabActive]}
+            onPress={() => setTab("rewards")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                tab === "rewards" && styles.tabTextActive,
+              ]}
+            >
+              Rewards
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Top stats */}
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
           <View style={[styles.peakCard, shadows.card]}>
             <Text style={styles.peakLabel}>PEAK FOCUS</Text>
             <Text style={styles.peakValue}>2 PM</Text>
@@ -64,7 +106,9 @@ const StatsScreen = () => {
           </View>
           <View style={[styles.streakCard, shadows.card]}>
             <Text style={styles.streakLabel}>CURRENT STREAK</Text>
-            <View style={styles.streakRow}>
+            <View
+              style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}
+            >
               <Text style={styles.streakNum}>14</Text>
               <Text style={styles.streakUnit}>days</Text>
             </View>
@@ -74,9 +118,9 @@ const StatsScreen = () => {
           </View>
         </View>
 
-        {/* Weekly Focus chart */}
-        <View style={[styles.card, shadows.card]}>
-          <View style={styles.rowBetween}>
+        {/* Weekly chart */}
+        <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
+          <View style={patterns.rowBetween}>
             <Text style={styles.cardTitle}>Weekly Focus</Text>
             <Text style={styles.cardMeta}>42.5 hrs total</Text>
           </View>
@@ -87,7 +131,7 @@ const StatsScreen = () => {
               </View>
             ))}
           </View>
-          <View style={styles.chartLabels}>
+          <View style={{ flexDirection: "row", gap: 8, paddingTop: 4 }}>
             {DAYS.map((d, i) => (
               <Text key={i} style={styles.chartLabel}>
                 {d}
@@ -96,11 +140,11 @@ const StatsScreen = () => {
           </View>
         </View>
 
-        {/* Consistency Grid */}
-        <View style={[styles.card, shadows.card]}>
-          <View style={styles.rowBetween}>
+        {/* Heatmap */}
+        <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
+          <View style={patterns.rowBetween}>
             <Text style={styles.cardTitle}>Consistency Grid</Text>
-            <View style={styles.legendRow}>
+            <View style={{ flexDirection: "row", gap: 3 }}>
               {[0, 1, 2, 3].map((i) => (
                 <View
                   key={i}
@@ -109,9 +153,9 @@ const StatsScreen = () => {
               ))}
             </View>
           </View>
-          <View style={styles.grid}>
+          <View style={{ gap: 4 }}>
             {GRID.map((row, ri) => (
-              <View key={ri} style={styles.gridRow}>
+              <View key={ri} style={{ flexDirection: "row", gap: 4 }}>
                 {row.map((cell, ci) => (
                   <View
                     key={ci}
@@ -126,9 +170,15 @@ const StatsScreen = () => {
           </View>
         </View>
 
-        {/* Mascot card */}
-        <View style={[styles.mascotCard, shadows.card]}>
-          <View style={styles.mascotHeader}>
+        {/* Mascot */}
+        <View style={[patterns.card, shadows.card, { gap: spacing.gutter }]}>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: spacing.sm,
+              alignItems: "center",
+            }}
+          >
             <View style={styles.mascotAvatar}>
               <Image source={{ uri: MASCOT }} style={styles.mascotImg} />
               <View style={styles.levelBadge}>
@@ -138,7 +188,7 @@ const StatsScreen = () => {
             <View style={{ flex: 1 }}>
               <Text style={styles.mascotName}>Mochi the{"\n"}Calico</Text>
               <Text style={styles.xpLabel}>XP Progress</Text>
-              <View style={styles.xpRow}>
+              <View style={{ gap: 4, marginTop: 4 }}>
                 <View style={styles.xpBar}>
                   <View style={[styles.xpBarFill, { width: "78%" }]} />
                 </View>
@@ -147,7 +197,6 @@ const StatsScreen = () => {
             </View>
           </View>
 
-          {/* Reward grid */}
           <View style={styles.rewardGrid}>
             {REWARDS.map((r, i) => (
               <View
@@ -176,31 +225,13 @@ const StatsScreen = () => {
   );
 };
 
-function cellColor(intensity) {
-  const map = [
-    `${colors.primary}10`,
-    `${colors.primaryContainer}80`,
-    colors.primaryContainer,
-    colors.primary,
-  ];
-  return map[intensity];
-}
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.surfaceContainerLow },
-  scroll: {
-    paddingHorizontal: spacing.containerPadding,
-    paddingTop: spacing.md,
-    gap: spacing.gutter,
-  },
-
   // Tabs
   tabs: {
     flexDirection: "row",
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii.full,
     padding: 4,
-    ...shadows.card,
   },
   tab: {
     flex: 1,
@@ -212,8 +243,7 @@ const styles = StyleSheet.create({
   tabText: { ...typography.bodyMd, color: colors.outline, fontWeight: "600" },
   tabTextActive: { color: colors.warmBrown },
 
-  // Top row
-  topRow: { flexDirection: "row", gap: spacing.sm },
+  // Stat cards (tinted variants of patterns.card)
   peakCard: {
     flex: 1,
     backgroundColor: `${colors.primaryContainer}22`,
@@ -241,7 +271,6 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontSize: 9,
   },
-  streakRow: { flexDirection: "row", alignItems: "baseline", gap: 4 },
   streakNum: { ...typography.h2, fontSize: 24, color: colors.warmBrown },
   streakUnit: { ...typography.bodySm, color: colors.onSurfaceVariant },
   streakBar: {
@@ -257,22 +286,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // Generic card
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii["3xl"],
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: `${colors.orange}18`,
-    gap: spacing.sm,
-  },
+  // Card titles
   cardTitle: { ...typography.h3, fontSize: 16, color: colors.warmBrown },
   cardMeta: { ...typography.bodySm, fontSize: 12, color: colors.outline },
-  rowBetween: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
 
   // Chart
   chartArea: {
@@ -287,7 +303,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     minHeight: 4,
   },
-  chartLabels: { flexDirection: "row", gap: 8, paddingTop: 4 },
   chartLabel: {
     flex: 1,
     textAlign: "center",
@@ -296,23 +311,11 @@ const styles = StyleSheet.create({
     color: colors.outline,
   },
 
-  // Heatmap grid
-  legendRow: { flexDirection: "row", gap: 3 },
+  // Heatmap
   legendCell: { width: 12, height: 12, borderRadius: 2 },
-  grid: { gap: 4 },
-  gridRow: { flexDirection: "row", gap: 4 },
   gridCell: { flex: 1, aspectRatio: 1, borderRadius: 4 },
 
   // Mascot
-  mascotCard: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii["3xl"],
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: `${colors.orange}18`,
-    gap: spacing.gutter,
-  },
-  mascotHeader: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   mascotAvatar: { position: "relative" },
   mascotImg: {
     width: 70,
@@ -341,7 +344,6 @@ const styles = StyleSheet.create({
     color: colors.outline,
     marginTop: 6,
   },
-  xpRow: { gap: 4, marginTop: 4 },
   xpBar: {
     height: 8,
     backgroundColor: colors.surfaceContainerHigh,

@@ -11,7 +11,14 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, spacing, radii, shadows, typography } from "../theme";
+import {
+  colors,
+  spacing,
+  radii,
+  shadows,
+  typography,
+  patterns,
+} from "../theme";
 
 // ─── Smart Filter Screen ──────────────────────────────────────────────────────
 export const FilterSettingsScreen = () => {
@@ -59,13 +66,13 @@ export const FilterSettingsScreen = () => {
   ];
 
   return (
-    <View style={styles.screen}>
+    <View style={patterns.screen}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Custom header with back button */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      {/* Header with back */}
+      <View style={[patterns.pageHeader, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
-          style={styles.backBtn}
+          style={[styles.backBtn, shadows.card]}
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="arrow-back" size={22} color={colors.warmBrown} />
@@ -76,13 +83,23 @@ export const FilterSettingsScreen = () => {
 
       <ScrollView
         contentContainerStyle={[
-          styles.scroll,
+          patterns.scrollContent,
           { paddingBottom: 120 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Brain card */}
-        <View style={[styles.brainCard, shadows.card]}>
+        <View
+          style={[
+            patterns.card,
+            shadows.card,
+            {
+              alignItems: "center",
+              gap: spacing.sm,
+              borderColor: `${colors.orange}22`,
+            },
+          ]}
+        >
           <View style={styles.brainIconWrap}>
             <MaterialIcons
               name="psychology"
@@ -102,13 +119,13 @@ export const FilterSettingsScreen = () => {
         </View>
 
         {/* App Notifications */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <View style={{ gap: spacing.sm }}>
+          <View style={patterns.sectionHeader}>
             <Text style={styles.sectionTitle}>App Notifications</Text>
             <Text style={styles.urgentOnly}>Urgent Only</Text>
           </View>
           {APPS.map((app) => (
-            <View key={app.id} style={[styles.row, shadows.card]}>
+            <View key={app.id} style={[patterns.row, shadows.card]}>
               <View
                 style={[styles.rowIcon, { backgroundColor: `${app.color}18` }]}
               >
@@ -132,15 +149,15 @@ export const FilterSettingsScreen = () => {
         </View>
 
         {/* Trusted Contacts */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <View style={{ gap: spacing.sm }}>
+          <View style={patterns.sectionHeader}>
             <Text style={styles.sectionTitle}>Trusted Contacts</Text>
             <TouchableOpacity>
               <Text style={styles.addNew}>+ Add New</Text>
             </TouchableOpacity>
           </View>
           {CONTACTS.map((c, i) => (
-            <View key={i} style={[styles.row, shadows.card]}>
+            <View key={i} style={[patterns.row, shadows.card]}>
               <View
                 style={[styles.rowIcon, { backgroundColor: `${c.color}22` }]}
               >
@@ -159,11 +176,11 @@ export const FilterSettingsScreen = () => {
           ))}
         </View>
 
-        {/* Quiet Zone Apps */}
-        <View style={styles.section}>
+        {/* Quiet Zone */}
+        <View style={{ gap: spacing.sm }}>
           <Text style={styles.sectionTitle}>Quiet Zone Apps</Text>
           {QUIET_APPS.map((q, i) => (
-            <View key={i} style={[styles.row, shadows.card]}>
+            <View key={i} style={[patterns.row, shadows.card]}>
               <View
                 style={[
                   styles.rowIcon,
@@ -187,9 +204,9 @@ export const FilterSettingsScreen = () => {
   );
 };
 
-// ─── Other misc screens (kept for navigator) ───────────────────────────────────
+// ─── Other misc screens ───────────────────────────────────────────────────────
 export const OverridesLogScreen = () => (
-  <View style={styles.screen}>
+  <View style={patterns.screen}>
     <View style={styles.placeholder}>
       <Text style={styles.placeholderTitle}>Overrides Log</Text>
       <Text style={styles.placeholderText}>
@@ -200,7 +217,7 @@ export const OverridesLogScreen = () => (
 );
 
 export const CalendarSyncScreen = () => (
-  <View style={styles.screen}>
+  <View style={patterns.screen}>
     <View style={styles.placeholder}>
       <Text style={styles.placeholderTitle}>Calendar Sync</Text>
       <Text style={styles.placeholderText}>
@@ -211,19 +228,6 @@ export const CalendarSyncScreen = () => (
 );
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.surfaceContainerLow },
-
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.unit * 1.5,
-    backgroundColor: colors.surfaceContainerLow,
-    borderBottomWidth: 1,
-    borderBottomColor: `${colors.orange}22`,
-  },
   backBtn: {
     width: 36,
     height: 36,
@@ -231,26 +235,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainerLowest,
     alignItems: "center",
     justifyContent: "center",
-    ...shadows.card,
   },
   headerTitle: { ...typography.h3, color: colors.orange },
 
-  scroll: {
-    paddingHorizontal: spacing.containerPadding,
-    paddingTop: spacing.md,
-    gap: spacing.gutter,
-  },
-
   // Brain card
-  brainCard: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii["3xl"],
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: `${colors.orange}22`,
-    alignItems: "center",
-    gap: spacing.sm,
-  },
   brainIconWrap: {
     width: 64,
     height: 64,
@@ -286,29 +274,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Sections
-  section: { gap: spacing.sm },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
+  // Section header text
   sectionTitle: { ...typography.h3, fontSize: 17, color: colors.warmBrown },
   urgentOnly: { ...typography.labelCaps, fontSize: 11, color: colors.primary },
   addNew: { ...typography.bodySm, color: colors.primary, fontWeight: "700" },
 
-  // Row
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii["2xl"],
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: `${colors.orange}18`,
-  },
+  // Row icons (square corners, not circles)
   rowIcon: {
     width: 38,
     height: 38,
@@ -329,7 +300,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Manage btn
   manageBtn: {
     alignItems: "center",
     paddingVertical: spacing.sm,

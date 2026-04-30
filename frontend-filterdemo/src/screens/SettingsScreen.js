@@ -11,14 +11,20 @@ import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Header from "../components/Header";
-import { colors, spacing, radii, shadows, typography } from "../theme";
+import {
+  colors,
+  spacing,
+  radii,
+  shadows,
+  typography,
+  patterns,
+} from "../theme";
 
 const THEMES = [
   { id: "classic", name: "Classic", primary: "#FFB150", accent: "#FEF8F3" },
   { id: "dark", name: "Dark Fur", primary: "#5A5550", accent: "#2A2825" },
   { id: "sakura", name: "Sakura", primary: "#FEB2C2", accent: "#FFE8EE" },
 ];
-
 const GRACE_OPTIONS = [5, 10, 15];
 
 const SettingsScreen = () => {
@@ -31,19 +37,24 @@ const SettingsScreen = () => {
   const [whiteNoise, setWhiteNoise] = useState(false);
 
   return (
-    <View style={styles.screen}>
+    <View style={patterns.screen}>
       <Header />
 
       <ScrollView
         contentContainerStyle={[
-          styles.scroll,
+          patterns.scrollContent,
           { paddingBottom: 120 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Active Plan */}
         <View style={[styles.planCard, shadows.card]}>
-          <View style={styles.planHeader}>
+          <View
+            style={[
+              patterns.rowBetween,
+              { alignItems: "flex-start", gap: spacing.sm },
+            ]}
+          >
             <View style={{ flex: 1 }}>
               <Text style={styles.planLabel}>ACTIVE PLAN</Text>
               <Text style={styles.planTitle}>Focus+ Member</Text>
@@ -61,7 +72,7 @@ const SettingsScreen = () => {
         </View>
 
         {/* Display Theme */}
-        <View style={[styles.card, shadows.card]}>
+        <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
           <Text style={styles.cardTitle}>Display Theme</Text>
           <View style={styles.themeRow}>
             {THEMES.map((t) => (
@@ -101,8 +112,8 @@ const SettingsScreen = () => {
         </View>
 
         {/* Grace Period */}
-        <View style={[styles.card, shadows.card]}>
-          <View style={styles.rowBetween}>
+        <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
+          <View style={patterns.rowBetween}>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>Grace Period</Text>
               <Text style={styles.cardSub}>Time to return before failing</Text>
@@ -110,7 +121,7 @@ const SettingsScreen = () => {
             <Text style={styles.graceValue}>{grace}m</Text>
           </View>
           <View style={styles.graceRow}>
-            {GRACE_OPTIONS.map((g, i) => (
+            {GRACE_OPTIONS.map((g) => (
               <TouchableOpacity
                 key={g}
                 style={[styles.graceDot, grace === g && styles.graceDotActive]}
@@ -121,18 +132,18 @@ const SettingsScreen = () => {
             ))}
             <View style={styles.graceTrack} />
           </View>
-          <View style={styles.graceLabels}>
+          <View style={patterns.rowBetween}>
             <Text style={styles.graceLabel}>5 MIN</Text>
             <Text style={styles.graceLabel}>15 MIN</Text>
           </View>
         </View>
 
         {/* Session Audio */}
-        <View style={[styles.card, shadows.card]}>
+        <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
           <Text style={styles.cardTitle}>Session Audio</Text>
 
           <View style={styles.audioRow}>
-            <View style={styles.audioIcon}>
+            <View style={patterns.circleIcon}>
               <MaterialIcons
                 name="notifications-active"
                 size={18}
@@ -155,7 +166,7 @@ const SettingsScreen = () => {
           </View>
 
           <View style={styles.audioRow}>
-            <View style={styles.audioIcon}>
+            <View style={patterns.circleIcon}>
               <MaterialIcons name="forest" size={18} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
@@ -176,13 +187,13 @@ const SettingsScreen = () => {
 
         {/* Smart Filter link */}
         <TouchableOpacity
-          style={[styles.linkRow, shadows.card]}
+          style={[patterns.row, shadows.card]}
           onPress={() => navigation.navigate("FilterSettings")}
           activeOpacity={0.85}
         >
           <View
             style={[
-              styles.audioIcon,
+              patterns.circleIcon,
               { backgroundColor: `${colors.primary}15` },
             ]}
           >
@@ -200,9 +211,12 @@ const SettingsScreen = () => {
         </TouchableOpacity>
 
         {/* Parental Control PIN */}
-        <View style={[styles.linkRow, shadows.card]}>
+        <View style={[patterns.row, shadows.card]}>
           <View
-            style={[styles.audioIcon, { backgroundColor: `${colors.error}15` }]}
+            style={[
+              patterns.circleIcon,
+              { backgroundColor: `${colors.error}15` },
+            ]}
           >
             <MaterialIcons name="lock" size={18} color={colors.error} />
           </View>
@@ -239,25 +253,11 @@ const SettingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.surfaceContainerLow },
-  scroll: {
-    paddingHorizontal: spacing.containerPadding,
-    paddingTop: spacing.md,
-    gap: spacing.gutter,
-  },
-
-  // Plan
+  // Plan card — uses tinted variant of patterns.card
   planCard: {
+    ...patterns.card,
     backgroundColor: `${colors.primaryContainer}22`,
-    borderRadius: radii["3xl"],
-    padding: spacing.md,
-    borderWidth: 1,
     borderColor: `${colors.orange}33`,
-    gap: spacing.sm,
-  },
-  planHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     gap: spacing.sm,
   },
   planLabel: { ...typography.labelCaps, color: colors.primary, fontSize: 10 },
@@ -273,18 +273,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   planStar: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.full,
+    ...patterns.circleIcon,
     backgroundColor: `${colors.primaryContainer}55`,
-    alignItems: "center",
-    justifyContent: "center",
   },
   manageBtn: {
-    backgroundColor: colors.primaryContainer,
-    borderRadius: radii["2xl"],
+    ...patterns.buttonPrimary,
     paddingVertical: 12,
-    alignItems: "center",
+    borderRadius: radii["2xl"],
   },
   manageBtnText: {
     ...typography.bodyMd,
@@ -292,22 +287,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Generic card
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii["3xl"],
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: `${colors.orange}18`,
-    gap: spacing.sm,
-  },
+  // Card titles
   cardTitle: { ...typography.h3, fontSize: 16, color: colors.warmBrown },
   cardSub: { ...typography.bodySm, color: colors.outline, marginTop: 2 },
-  rowBetween: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
 
   // Theme picker
   themeRow: { flexDirection: "row", gap: spacing.sm, marginTop: 4 },
@@ -369,27 +351,14 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: "#fff",
   },
-  graceLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 4,
-  },
   graceLabel: { ...typography.labelCaps, fontSize: 10, color: colors.outline },
 
-  // Audio rows
+  // Audio
   audioRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     paddingVertical: 6,
-  },
-  audioIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.full,
-    backgroundColor: `${colors.primaryContainer}33`,
-    alignItems: "center",
-    justifyContent: "center",
   },
   audioName: {
     ...typography.bodyMd,
@@ -402,18 +371,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.outline,
     marginTop: 2,
-  },
-
-  // Link rows
-  linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii["3xl"],
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: `${colors.orange}18`,
   },
 
   // Sign out
