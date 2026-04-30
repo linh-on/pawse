@@ -1,0 +1,132 @@
+// ─── Pawse Design System ─────────────────────────────────────────────────────
+
+export const colors = {
+  primary:                  '#875300',
+  primaryContainer:         '#FFB150',
+  onPrimary:                '#FFFFFF',
+  onPrimaryContainer:       '#714500',
+  primaryFixed:             '#FFDDBA',
+  primaryFixedDim:          '#FFB965',
+  onPrimaryFixed:           '#2b1700',
+  inversePrimary:           '#FFB965',
+
+  secondary:                '#884d5b',
+  secondaryContainer:       '#FEB2C2',
+  secondaryFixed:           '#FFD9DF',
+  secondaryFixedDim:        '#FEB2C2',
+  onSecondary:              '#FFFFFF',
+  onSecondaryContainer:     '#7A414F',
+  onSecondaryFixed:         '#370b19',
+  onSecondaryFixedVariant:  '#6c3644',
+
+  tertiary:                 '#885113',
+  tertiaryContainer:        '#FBB26C',
+  tertiaryFixed:            '#FFDCBF',
+  tertiaryFixedDim:         '#FFB874',
+  onTertiary:               '#FFFFFF',
+  onTertiaryContainer:      '#764202',
+  onTertiaryFixed:          '#2d1600',
+  onTertiaryFixedVariant:   '#6b3b00',
+
+  background:               '#FEF8F3',
+  surface:                  '#FEF8F3',
+  surfaceBright:            '#FEF8F3',
+  surfaceDim:               '#DFD9D4',
+  surfaceTint:              '#875300',
+  surfaceVariant:           '#E7E1DD',
+  surfaceContainer:         '#F3EDE8',
+  surfaceContainerLow:      '#F9F3EE',
+  surfaceContainerHigh:     '#EDE7E2',
+  surfaceContainerHighest:  '#E7E1DD',
+  surfaceContainerLowest:   '#FFFFFF',
+  inverseSurface:           '#32302D',
+  inverseOnSurface:         '#F6F0EB',
+
+  onBackground:             '#1D1B19',
+  onSurface:                '#1D1B19',
+  onSurfaceVariant:         '#524436',
+
+  outline:                  '#847464',
+  outlineVariant:           '#D7C3B1',
+
+  error:                    '#BA1A1A',
+  errorContainer:           '#FFDAD6',
+  onError:                  '#FFFFFF',
+  onErrorContainer:         '#93000A',
+
+  // Convenience aliases used throughout UI
+  orange:                   '#FFB150',
+  warmBrown:                '#524436',
+  cardBorder:               '#FFF3E8',
+};
+
+export const spacing = {
+  xs:    4,
+  sm:    12,
+  unit:  8,
+  gutter: 16,
+  md:    24,
+  lg:    40,
+  xl:    64,
+  containerPadding: 20,
+};
+
+export const radii = {
+  sm:   8,
+  md:   12,
+  lg:   16,
+  xl:   20,
+  '2xl': 24,
+  '3xl': 28,
+  '4xl': 32,
+  full: 9999,
+};
+
+export const shadows = {
+  soft: {
+    shadowColor: '#A57A62',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  card: {
+    shadowColor: '#A57A62',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  timer: {
+    shadowColor: '#FFB150',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    elevation: 8,
+  },
+};
+
+// Font families (requires expo-google-fonts setup — see README)
+export const fonts = {
+  h1:      'Nunito_800ExtraBold',
+  h2:      'Nunito_700Bold',
+  h3:      'Nunito_700Bold',
+  bodyMd:  'DMSans_400Regular',
+  bodyLg:  'DMSans_400Regular',
+  bodySm:  'DMSans_500Medium',
+  label:   'DMSans_700Bold',
+  display: 'PlusJakartaSans_800ExtraBold',
+  // Fallbacks used before fonts load
+  fallback: 'System',
+};
+
+export const typography = {
+  h1: { fontSize: 32, lineHeight: 38, letterSpacing: -0.64, fontWeight: '800' },
+  h2: { fontSize: 24, lineHeight: 31, fontWeight: '700' },
+  h3: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
+  bodyLg: { fontSize: 18, lineHeight: 29, fontWeight: '400' },
+  bodyMd: { fontSize: 16, lineHeight: 26, fontWeight: '400' },
+  bodySm: { fontSize: 14, lineHeight: 21, fontWeight: '500' },
+  labelCaps: { fontSize: 12, lineHeight: 12, letterSpacing: 0.6, fontWeight: '700', textTransform: 'uppercase' },
+  timerDisplay: { fontSize: 56, lineHeight: 60, fontWeight: '900', letterSpacing: -2 },
+};
