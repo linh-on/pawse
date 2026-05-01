@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Header from "../components/Header";
 import { colors, spacing, radii, shadows, typography } from "../theme";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/AuthContext";
 
 const MASCOT_HOME =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAFb7jjkY7NC_rkg3sSsGcNFn_sR9nbvDa0TNzK5TxPChSaCiPu-whKcwwYnarqWvGT2ugbEnmENbhqq7nC0PbNLUy7JnOBtcL8tgo4wH1AuTgI4C6Qtx280aMVHmlbwYDTCBJ7Z_OpC6kuI0fwt3Wm7tQMSdQckNWj9LkEoUBNMGoa-za19rKhTEwV-5A2gSPy1SuuHczBGQ-5uuSJImUrzvjDSm9wwCtb4UCC3dH9udT_9RJAH_pcH7CB3QmKWW3kArkr_DHxO3Ci";
@@ -25,6 +27,37 @@ const PREP_ITEMS = [
   { id: 2, label: "Grab a glass of water" },
   { id: 3, label: "Ready the noise-cancelling headphones" },
 ];
+
+const formatMinutes = (minutes) => {
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+
+  if (hrs > 0 && mins > 0) return `${hrs}h ${mins}m`;
+  if (hrs > 0) return `${hrs}h`;
+  return `${mins}m`;
+};
+
+const getCurrentStreak = (sessions) => {
+  const completedDays = new Set(
+    sessions
+      .filter((s) => s.completed)
+      .map((s) => new Date(s.started_at).toDateString()),
+  );
+
+  let streak = 0;
+  const cursor = new Date();
+
+  if (!completedDays.has(cursor.toDateString())) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  while (completedDays.has(cursor.toDateString())) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+};
 
 // Full ring dial — solid color, no moving parts
 const FocusDial = ({ minutes }) => (
@@ -62,12 +95,53 @@ const dialStyles = StyleSheet.create({
 const HomeScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+
   const [minutes, setMinutes] = useState(45);
+  const [todayMinutes, setTodayMinutes] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [loadingStats, setLoadingStats] = useState(true);
   const [checkedItems, setCheckedItems] = useState({
     1: true,
     2: false,
     3: false,
   });
+
+  useEffect(() => {
+    const fetchHomeStats = async () => {
+      if (!user?.id) {
+        setLoadingStats(false);
+        return;
+      }
+
+      setLoadingStats(true);
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("id, duration_minutes, started_at, completed")
+        .eq("user_id", user.id)
+        .order("started_at", { ascending: false });
+
+      if (!error && data) {
+        const todayTotal = data
+          .filter((session) => {
+            const startedAt = new Date(session.started_at);
+            return session.completed && startedAt >= todayStart;
+          })
+          .reduce((sum, session) => sum + (session.duration_minutes || 0), 0);
+
+        setTodayMinutes(todayTotal);
+        setStreak(getCurrentStreak(data));
+      }
+
+      setLoadingStats(false);
+    };
+
+    fetchHomeStats();
+  }, [user?.id]);
 
   const adjustMinutes = (delta) => {
     setMinutes((prev) =>
@@ -96,7 +170,9 @@ const HomeScreen = () => {
             style={styles.mascot}
             resizeMode="cover"
           />
-          <Text style={styles.greeting}>Hi, Buddy!</Text>
+          <Text style={styles.greeting}>
+            Hi, {user?.name?.split(" ")[0] || "there"}!
+          </Text>
           <Text style={styles.subtitle}>Ready for some focus time?</Text>
         </View>
 
@@ -108,7 +184,9 @@ const HomeScreen = () => {
               color={colors.primaryContainer}
             />
             <Text style={styles.statLabel}>TODAY</Text>
-            <Text style={styles.statValue}>2h 15m</Text>
+            <Text style={styles.statValue}>
+              {loadingStats ? "..." : formatMinutes(todayMinutes)}
+            </Text>
           </View>
           <View style={[styles.statCard, shadows.card]}>
             <MaterialIcons
@@ -117,7 +195,9 @@ const HomeScreen = () => {
               color={colors.secondary}
             />
             <Text style={styles.statLabel}>STREAK</Text>
-            <Text style={styles.statValue}>5 days</Text>
+            <Text style={styles.statValue}>
+              {loadingStats ? "..." : `${streak} days`}
+            </Text>
           </View>
         </View>
 

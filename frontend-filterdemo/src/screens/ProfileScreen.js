@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -19,17 +20,62 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/AuthContext";
 
 const PROFILE_AVATAR =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuDFf66XVpfWKaaPQ5VXeJ9CnLYJOuG5pYlP69zwiD95-7ggVWwsKNVDVg0MRYXrOeSAOzEAUSNJsyS1TqOOCUqs-2gF695A5eOB_AW1wzuJnPNqrBHL5GuXVZKxnk3iVrX7vCtHPR6N0Qj076KqIKaztPlX2NfbZK1cx6OTlcaRXS-R2lj-4XWqFLs5rBtVGLumb88WfswLAuaCc3iOPSfdMFNWBq0ffzO4fo9M7FYPJ5YlN70TUJHUP4X9KPHGqoW1-guyMzrgyM9B";
 
+const formatBirthday = (dateString) => {
+  if (!dateString) return "";
+  const date = new Date(dateString + "T00:00:00");
+  return date.toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" });
+};
+
+const toDatabaseDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toISOString().slice(0, 10);
+};
+
 const ProfileScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { user, setUser } = useAuth();
 
-  const [name, setName] = useState("Buddy Pawson");
-  const [birthday, setBirthday] = useState("March 14, 2008");
-  const [email] = useState("buddy@pawse.app");
+  const [name, setName] = useState(user?.name || "");
+  const [birthday, setBirthday] = useState(formatBirthday(user?.birthday));
+  const email = user?.email || "";
+
+  useEffect(() => {
+    setName(user?.name || "");
+    setBirthday(formatBirthday(user?.birthday));
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user?.id) return;
+
+    const updates = {
+      name: name.trim(),
+      birthday: toDatabaseDate(birthday),
+    };
+
+    const { data, error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", user.id)
+      .select("*")
+      .single();
+
+    if (error) {
+      Alert.alert("Could not save profile", error.message);
+      return;
+    }
+
+    setUser(data);
+    Alert.alert("Saved", "Your profile has been updated.");
+  };
 
   return (
     <View style={patterns.screen}>
@@ -124,7 +170,7 @@ const ProfileScreen = () => {
 
         <TouchableOpacity
           style={[patterns.buttonPrimary, shadows.soft]}
-          onPress={() => navigation.goBack()}
+          onPress={handleSave}
         >
           <Text style={styles.saveBtnText}>Save Changes</Text>
         </TouchableOpacity>

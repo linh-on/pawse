@@ -8,6 +8,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -20,6 +22,8 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/AuthContext";
 
 const MASCOT =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAFb7jjkY7NC_rkg3sSsGcNFn_sR9nbvDa0TNzK5TxPChSaCiPu-whKcwwYnarqWvGT2ugbEnmENbhqq7nC0PbNLUy7JnOBtcL8tgo4wH1AuTgI4C6Qtx280aMVHmlbwYDTCBJ7Z_OpC6kuI0fwt3Wm7tQMSdQckNWj9LkEoUBNMGoa-za19rKhTEwV-5A2gSPy1SuuHczBGQ-5uuSJImUrzvjDSm9wwCtb4UCC3dH9udT_9RJAH_pcH7CB3QmKWW3kArkr_DHxO3Ci";
@@ -27,11 +31,46 @@ const MASCOT =
 const SignInScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { setUser } = useAuth();
 
-  const handleSignIn = () => {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Demo sign-in: looks up the email in users table, signs in if found
+  const handleSignIn = async () => {
+    if (!email.trim()) {
+      Alert.alert("Email required", "Enter an email to sign in.");
+      return;
+    }
+
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email.trim().toLowerCase())
+      .maybeSingle();
+    setLoading(false);
+
+    if (error) {
+      Alert.alert("Connection error", error.message);
+      return;
+    }
+
+    if (!data) {
+      Alert.alert(
+        "User not found",
+        "No demo user exists for this email. Try one of the seeded accounts: buddy@pawse.app or bob@pawse.app.",
+      );
+      return;
+    }
+
+    setUser(data);
     navigation.reset({ index: 0, routes: [{ name: "Main" }] });
+  };
+
+  // Quick-pick a seeded demo user
+  const useDemoAccount = (demoEmail) => {
+    setEmail(demoEmail);
   };
 
   return (
@@ -39,7 +78,6 @@ const SignInScreen = () => {
       style={[styles.screen, { paddingTop: insets.top + spacing.lg }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      {/* Hero */}
       <View
         style={{
           alignItems: "center",
@@ -52,7 +90,6 @@ const SignInScreen = () => {
         <Text style={styles.subtitle}>Your smart focus companion</Text>
       </View>
 
-      {/* Form */}
       <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
         <Text style={styles.label}>Email</Text>
         <View style={styles.inputWrap}>
@@ -65,59 +102,54 @@ const SignInScreen = () => {
             placeholderTextColor={colors.outlineVariant}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
-
-        <Text style={styles.label}>Password</Text>
-        <View style={styles.inputWrap}>
-          <MaterialIcons name="lock-outline" size={20} color={colors.outline} />
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor={colors.outlineVariant}
-            secureTextEntry
-          />
-        </View>
-
-        <TouchableOpacity style={{ alignSelf: "flex-end", marginTop: 4 }}>
-          <Text style={styles.forgotText}>Forgot password?</Text>
-        </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             patterns.buttonPrimary,
             shadows.soft,
             { borderRadius: radii["2xl"], marginTop: spacing.sm },
+            loading && { opacity: 0.6 },
           ]}
           onPress={handleSignIn}
+          disabled={loading}
         >
-          <Text style={styles.signInText}>Sign In</Text>
+          {loading ? (
+            <ActivityIndicator color={colors.onPrimaryContainer} />
+          ) : (
+            <Text style={styles.signInText}>Sign In</Text>
+          )}
         </TouchableOpacity>
 
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
+          <Text style={styles.dividerText}>QUICK DEMO</Text>
           <View style={styles.dividerLine} />
         </View>
 
-        <TouchableOpacity style={styles.socialBtn} onPress={handleSignIn}>
-          <MaterialIcons
-            name="account-circle"
-            size={20}
-            color={colors.warmBrown}
-          />
-          <Text style={styles.socialText}>Continue with Google</Text>
-        </TouchableOpacity>
+        {/* Quick-pick buttons for seeded accounts */}
+        <View style={{ gap: 8 }}>
+          {["buddy@pawse.app", "bob@pawse.app"].map((e) => (
+            <TouchableOpacity
+              key={e}
+              style={styles.demoBtn}
+              onPress={() => useDemoAccount(e)}
+            >
+              <MaterialIcons
+                name="account-circle"
+                size={18}
+                color={colors.warmBrown}
+              />
+              <Text style={styles.demoBtnText}>{e}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Don't have an account?</Text>
-        <TouchableOpacity onPress={handleSignIn}>
-          <Text style={styles.footerLink}> Sign Up</Text>
-        </TouchableOpacity>
+        <Text style={styles.footerText}>Demo mode — no password required</Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -160,11 +192,6 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
   },
   input: { flex: 1, ...typography.bodyMd, color: colors.onSurface },
-  forgotText: {
-    ...typography.bodySm,
-    color: colors.primary,
-    fontWeight: "600",
-  },
   signInText: {
     ...typography.h3,
     fontSize: 16,
@@ -180,33 +207,32 @@ const styles = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.outlineVariant },
   dividerText: { ...typography.labelCaps, color: colors.outline, fontSize: 10 },
 
-  socialBtn: {
+  demoBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderRadius: radii["2xl"],
+    paddingVertical: 10,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.outlineVariant,
+    backgroundColor: colors.surfaceContainerLowest,
   },
-  socialText: {
-    ...typography.bodyMd,
+  demoBtnText: {
+    ...typography.bodySm,
     color: colors.warmBrown,
     fontWeight: "600",
   },
 
   footer: {
-    flexDirection: "row",
-    justifyContent: "center",
+    alignItems: "center",
     paddingBottom: spacing.lg,
     paddingTop: spacing.md,
   },
-  footerText: { ...typography.bodyMd, color: colors.onSurfaceVariant },
-  footerLink: {
-    ...typography.bodyMd,
-    color: colors.primary,
-    fontWeight: "700",
+  footerText: {
+    ...typography.bodySm,
+    color: colors.outline,
+    fontStyle: "italic",
   },
 });
 

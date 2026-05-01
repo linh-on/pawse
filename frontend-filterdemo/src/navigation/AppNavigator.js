@@ -15,13 +15,11 @@ import SignInScreen from "../screens/SignInScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import {
   FilterSettingsScreen,
-  OverridesLogScreen,
   CalendarSyncScreen,
 } from "../screens/MiscScreens";
 
 import { colors, spacing, radii, shadows, typography } from "../theme";
 
-// ── Tab bar ───────────────────────────────────────────────────────────────────
 const TAB_ITEMS = [
   { name: "Home", icon: "home", label: "Home" },
   { name: "Stats", icon: "leaderboard", label: "Stats" },
@@ -31,12 +29,14 @@ const TAB_ITEMS = [
 
 const CustomTabBar = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
+
   return (
     <View style={[tabStyles.bar, { paddingBottom: insets.bottom + 8 }]}>
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const item =
           TAB_ITEMS.find((t) => t.name === route.name) ?? TAB_ITEMS[0];
+
         return (
           <TouchableOpacity
             key={route.key}
@@ -90,7 +90,6 @@ const tabStyles = StyleSheet.create({
   labelActive: { color: colors.orange },
 });
 
-// ── Stacks ────────────────────────────────────────────────────────────────────
 const RootStack = createNativeStackNavigator();
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -107,7 +106,12 @@ const HomeStack = () => (
 const StatsStack = () => (
   <Stack.Navigator screenOptions={NO_HEADER}>
     <Stack.Screen name="Stats" component={StatsScreen} />
-    <Stack.Screen name="Overrides" component={OverridesLogScreen} />
+  </Stack.Navigator>
+);
+
+const CalendarStack = () => (
+  <Stack.Navigator screenOptions={NO_HEADER}>
+    <Stack.Screen name="Calendar" component={CalendarScreen} />
   </Stack.Navigator>
 );
 
@@ -116,12 +120,6 @@ const SettingsStack = () => (
     <Stack.Screen name="Settings" component={SettingsScreen} />
     <Stack.Screen name="FilterSettings" component={FilterSettingsScreen} />
     <Stack.Screen name="CalendarSync" component={CalendarSyncScreen} />
-  </Stack.Navigator>
-);
-
-const CalendarStack = () => (
-  <Stack.Navigator screenOptions={NO_HEADER}>
-    <Stack.Screen name="Calendar" component={CalendarScreen} />
   </Stack.Navigator>
 );
 

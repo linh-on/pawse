@@ -15,6 +15,8 @@ import CircularProgress from "../components/CircularProgress";
 import Header from "../components/Header";
 import { usePawseBox } from "../hooks/usePawseBox";
 import { colors, spacing, radii, shadows, typography } from "../theme";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/AuthContext";
 
 import { fmt, parseTime } from "./active-session/utils";
 import { useNotifSimulator } from "./active-session/useNotifSimulator";
@@ -26,6 +28,7 @@ const ActiveSessionScreen = () => {
   const route = useRoute();
   const insets = useSafeAreaInsets();
 
+  const { user } = useAuth();
   const { durationMinutes = 45 } = route.params ?? {};
   const TOTAL_SECONDS = durationMinutes * 60;
 
@@ -36,9 +39,27 @@ const ActiveSessionScreen = () => {
   const [localRemaining, setLocalRemaining] = useState(TOTAL_SECONDS);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const sessionStartedRef = useRef(false);
+  const dbSessionIdRef = useRef(null);
+  const sessionFinishedRef = useRef(false);
 
-  // Notification sim hook — wired to box actions
+  const saveNotificationLog = async (entry) => {
+    if (!dbSessionIdRef.current) return;
+
+    const { error } = await supabase.from("notification_logs").insert({
+      session_id: dbSessionIdRef.current,
+      text: entry.text,
+      predicted_label: entry.predicted,
+      was_allowed: entry.predicted === "urgent",
+    });
+
+    if (error) {
+      console.warn("Could not save notification log:", error.message);
+    }
+  };
+
+  // Notification sim hook — wired to box actions and Supabase logs
   const sim = useNotifSimulator({
+    onNotificationClassified: saveNotificationLog,
     onUrgentDetected: (entry) => {
       if (connected) actions.sendUrgent(entry.text.slice(0, 16));
     },
@@ -46,6 +67,59 @@ const ActiveSessionScreen = () => {
       if (connected) actions.respondUrgent(false); // stay locked
     },
   });
+
+  // Create a database session row when this screen opens.
+  useEffect(() => {
+    let mounted = true;
+
+    const createSession = async () => {
+      if (!user?.id) return;
+
+      const { data, error } = await supabase
+        .from("sessions")
+        .insert({
+          user_id: user.id,
+          duration_minutes: durationMinutes,
+          started_at: new Date().toISOString(),
+          completed: false,
+        })
+        .select("id")
+        .single();
+
+      if (error) {
+        console.warn("Could not create focus session:", error.message);
+        return;
+      }
+
+      if (mounted) {
+        dbSessionIdRef.current = data.id;
+      }
+    };
+
+    createSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id, durationMinutes]);
+
+  const finishDbSession = async (completed) => {
+    if (!dbSessionIdRef.current || sessionFinishedRef.current) return;
+
+    sessionFinishedRef.current = true;
+
+    const { error } = await supabase
+      .from("sessions")
+      .update({
+        ended_at: new Date().toISOString(),
+        completed,
+      })
+      .eq("id", dbSessionIdRef.current);
+
+    if (error) {
+      console.warn("Could not update focus session:", error.message);
+    }
+  };
 
   // Tell the box to start when first connected
   useEffect(() => {
@@ -87,10 +161,18 @@ const ActiveSessionScreen = () => {
   const displayTime = connected ? boxRemaining : fmt(localRemaining);
   const progress = remainingSecs / TOTAL_SECONDS;
 
+  // Mark the session complete when countdown reaches zero.
+  useEffect(() => {
+    if (remainingSecs <= 0) {
+      finishDbSession(true);
+    }
+  }, [remainingSecs]);
+
   // Emergency — unlock box immediately, return to home
-  function emergencyUnlock() {
+  async function emergencyUnlock() {
     if (connected) actions.respondUrgent(true);
     sim.clearModal();
+    await finishDbSession(false);
     navigation.navigate("Home");
   }
 
@@ -182,6 +264,7 @@ const ActiveSessionScreen = () => {
         opacity={sim.modalOpacity}
         connected={connected}
         onDismiss={sim.dismissModal}
+        onOverride={emergencyUnlock}
       />
     </View>
   );

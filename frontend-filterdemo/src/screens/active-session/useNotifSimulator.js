@@ -81,8 +81,17 @@ export function useNotifSimulator({ onUrgentDetected, onUrgentDismiss }) {
     modalScale.setValue(0.85);
     modalOpacity.setValue(0);
     Animated.parallel([
-      Animated.spring(modalScale, { toValue: 1, useNativeDriver: true, tension: 90, friction: 10 }),
-      Animated.timing(modalOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.spring(modalScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 90,
+        friction: 10,
+      }),
+      Animated.timing(modalOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
     ]).start();
   }
 
@@ -92,22 +101,35 @@ export function useNotifSimulator({ onUrgentDetected, onUrgentDismiss }) {
     }
     onUrgentDismiss?.();
 
-    Animated.timing(modalOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+    Animated.timing(modalOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
       if (urgentModal) setFeed((prev) => [urgentModal, ...prev].slice(0, 20));
       setUrgentModal(null);
     });
   }
 
   function clearModal() {
-    Animated.timing(modalOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+    Animated.timing(modalOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
       setUrgentModal(null);
     });
   }
 
   return {
-    feed, isRunning, urgentModal,
-    modalScale, modalOpacity,
-    fireNext, togglePlay: () => setIsRunning((v) => !v),
-    dismissModal, clearModal,
+    feed,
+    isRunning,
+    urgentModal,
+    modalScale,
+    modalOpacity,
+    fireNext,
+    togglePlay: () => setIsRunning((v) => !v),
+    dismissModal,
+    clearModal,
   };
 }

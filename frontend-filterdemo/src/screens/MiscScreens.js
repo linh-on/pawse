@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -19,11 +19,14 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/AuthContext";
 
 // ─── Smart Filter Screen ──────────────────────────────────────────────────────
 export const FilterSettingsScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
   const [apps, setApps] = useState({
     messenger: true,
@@ -55,15 +58,40 @@ export const FilterSettingsScreen = () => {
     },
   ];
 
-  const CONTACTS = [
-    { name: "Mom", note: "Always Urgent", color: colors.primary },
-    { name: "Alex (Work)", note: "Always Urgent", color: colors.secondary },
-  ];
+  const [contacts, setContacts] = useState([]);
+  const [quietApps, setQuietApps] = useState([]);
 
-  const QUIET_APPS = [
-    { name: "Streaming & Entertainment", icon: "play-circle" },
-    { name: "Gaming Apps", icon: "sports-esports" },
-  ];
+  useEffect(() => {
+    const fetchFilterData = async () => {
+      if (!user?.id) return;
+
+      const [{ data: contactRows, error: contactError }, { data: appRows, error: appError }] =
+        await Promise.all([
+          supabase
+            .from("trusted_contacts")
+            .select("id, name, note, always_urgent")
+            .eq("user_id", user.id)
+            .order("name", { ascending: true }),
+          supabase
+            .from("blocked_apps")
+            .select("id, app_name, category")
+            .eq("user_id", user.id)
+            .order("app_name", { ascending: true }),
+        ]);
+
+      if (!contactError && contactRows) setContacts(contactRows);
+      if (!appError && appRows) setQuietApps(appRows);
+    };
+
+    fetchFilterData();
+  }, [user?.id]);
+
+  const getBlockedAppIcon = (category) => {
+    if (category === "games") return "sports-esports";
+    if (category === "entertainment") return "play-circle";
+    if (category === "social") return "chat";
+    return "block";
+  };
 
   return (
     <View style={patterns.screen}>
@@ -156,12 +184,12 @@ export const FilterSettingsScreen = () => {
               <Text style={styles.addNew}>+ Add New</Text>
             </TouchableOpacity>
           </View>
-          {CONTACTS.map((c, i) => (
-            <View key={i} style={[patterns.row, shadows.card]}>
+          {contacts.map((c) => (
+            <View key={c.id} style={[patterns.row, shadows.card]}>
               <View
-                style={[styles.rowIcon, { backgroundColor: `${c.color}22` }]}
+                style={[styles.rowIcon, { backgroundColor: `${colors.primary}22` }]}
               >
-                <MaterialIcons name="person" size={20} color={c.color} />
+                <MaterialIcons name="person" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rowName}>{c.name}</Text>
@@ -179,18 +207,18 @@ export const FilterSettingsScreen = () => {
         {/* Quiet Zone */}
         <View style={{ gap: spacing.sm }}>
           <Text style={styles.sectionTitle}>Quiet Zone Apps</Text>
-          {QUIET_APPS.map((q, i) => (
-            <View key={i} style={[patterns.row, shadows.card]}>
+          {quietApps.map((q) => (
+            <View key={q.id} style={[patterns.row, shadows.card]}>
               <View
                 style={[
                   styles.rowIcon,
                   { backgroundColor: colors.surfaceContainer },
                 ]}
               >
-                <MaterialIcons name={q.icon} size={20} color={colors.outline} />
+                <MaterialIcons name={getBlockedAppIcon(q.category)} size={20} color={colors.outline} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.rowName}>{q.name}</Text>
+                <Text style={styles.rowName}>{q.app_name}</Text>
               </View>
               <MaterialIcons name="block" size={20} color={colors.error} />
             </View>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/AuthContext";
 
 const THEMES = [
   { id: "classic", name: "Classic", primary: "#FFB150", accent: "#FEF8F3" },
@@ -30,11 +32,70 @@ const GRACE_OPTIONS = [5, 10, 15];
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
   const [theme, setTheme] = useState("classic");
   const [grace, setGrace] = useState(10);
   const [chime, setChime] = useState(true);
   const [whiteNoise, setWhiteNoise] = useState(false);
+  const [parentalPin, setParentalPin] = useState(false);
+
+  useEffect(() => {
+    const fetchPreferences = async () => {
+      if (!user?.id) return;
+
+      const { data, error } = await supabase
+        .from("preferences")
+        .select(
+          "theme, grace_period_minutes, end_chime_enabled, white_noise_enabled, parental_pin_enabled",
+        )
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        setTheme(data.theme || "classic");
+        setGrace(data.grace_period_minutes || 10);
+        setChime(Boolean(data.end_chime_enabled));
+        setWhiteNoise(Boolean(data.white_noise_enabled));
+        setParentalPin(Boolean(data.parental_pin_enabled));
+      }
+    };
+
+    fetchPreferences();
+  }, [user?.id]);
+
+  const updatePreference = async (updates) => {
+    if (!user?.id) return;
+
+    await supabase
+      .from("preferences")
+      .upsert({ user_id: user.id, ...updates }, { onConflict: "user_id" });
+  };
+
+  const handleThemeChange = (value) => {
+    setTheme(value);
+    updatePreference({ theme: value });
+  };
+
+  const handleGraceChange = (value) => {
+    setGrace(value);
+    updatePreference({ grace_period_minutes: value });
+  };
+
+  const handleChimeChange = (value) => {
+    setChime(value);
+    updatePreference({ end_chime_enabled: value });
+  };
+
+  const handleWhiteNoiseChange = (value) => {
+    setWhiteNoise(value);
+    updatePreference({ white_noise_enabled: value });
+  };
+
+  const handleParentalPinChange = (value) => {
+    setParentalPin(value);
+    updatePreference({ parental_pin_enabled: value });
+  };
 
   return (
     <View style={patterns.screen}>
@@ -82,7 +143,7 @@ const SettingsScreen = () => {
                   styles.themeOption,
                   theme === t.id && styles.themeOptionActive,
                 ]}
-                onPress={() => setTheme(t.id)}
+                onPress={() => handleThemeChange(t.id)}
                 activeOpacity={0.85}
               >
                 <View
@@ -125,7 +186,7 @@ const SettingsScreen = () => {
               <TouchableOpacity
                 key={g}
                 style={[styles.graceDot, grace === g && styles.graceDotActive]}
-                onPress={() => setGrace(g)}
+                onPress={() => handleGraceChange(g)}
               >
                 {grace === g && <View style={styles.graceDotInner} />}
               </TouchableOpacity>
@@ -156,7 +217,7 @@ const SettingsScreen = () => {
             </View>
             <Switch
               value={chime}
-              onValueChange={setChime}
+              onValueChange={handleChimeChange}
               trackColor={{
                 false: colors.surfaceContainerHigh,
                 true: colors.primary,
@@ -175,7 +236,7 @@ const SettingsScreen = () => {
             </View>
             <Switch
               value={whiteNoise}
-              onValueChange={setWhiteNoise}
+              onValueChange={handleWhiteNoiseChange}
               trackColor={{
                 false: colors.surfaceContainerHigh,
                 true: colors.primary,
@@ -227,8 +288,8 @@ const SettingsScreen = () => {
             </Text>
           </View>
           <Switch
-            value={false}
-            onValueChange={() => {}}
+            value={parentalPin}
+            onValueChange={handleParentalPinChange}
             trackColor={{
               false: colors.surfaceContainerHigh,
               true: colors.primary,

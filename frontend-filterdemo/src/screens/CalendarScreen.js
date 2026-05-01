@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -18,41 +18,55 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/AuthContext";
 
-const EVENTS = [
-  {
-    id: 1,
-    time: "09:00 AM",
-    title: "Daily Catchup",
-    sub: "Product Team sync",
-    tag: null,
-    accent: colors.primaryContainer,
-    icon: "group",
-  },
-  {
-    id: 2,
-    time: "12:00 PM",
-    title: "Vet Appointment",
-    sub: "Luna's checkup",
-    tag: "PET CLINIC SE2",
-    accent: colors.secondaryFixed,
-    icon: "pets",
-  },
-  {
-    id: 3,
-    time: "03:00 PM",
-    title: "Walk in the Park",
-    sub: "Fresh air break",
-    tag: "SUNSET TIME",
-    accent: colors.tertiaryFixed,
-    icon: "directions-walk",
-  },
-];
+const formatEventTime = (time) => {
+  if (!time) return "No time";
+  const [hours, minutes] = time.split(":");
+  const date = new Date();
+  date.setHours(Number(hours), Number(minutes || 0), 0, 0);
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+};
+
+const getEventAccent = (source) => {
+  if (source === "google") return colors.primaryContainer;
+  if (source === "manual") return colors.tertiaryFixed;
+  return colors.secondaryFixed;
+};
+
+const getEventIcon = (tag) => {
+  const text = (tag || "").toLowerCase();
+  if (text.includes("homework")) return "menu-book";
+  if (text.includes("family")) return "family-restroom";
+  if (text.includes("sport")) return "sports-basketball";
+  if (text.includes("pet")) return "pets";
+  if (text.includes("team")) return "group";
+  return "event";
+};
 
 const CalendarScreen = () => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [boxDisplay, setBoxDisplay] = useState(true);
   const [appleConnected, setAppleConnected] = useState(false);
+  const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      if (!user?.id) return;
+
+      const { data, error } = await supabase
+        .from("calendar_events")
+        .select("id, title, subtitle, event_time, tag, source")
+        .eq("user_id", user.id)
+        .order("event_time", { ascending: true });
+
+      if (!error && data) setEvents(data);
+    };
+
+    fetchEvents();
+  }, [user?.id]);
 
   return (
     <View style={patterns.screen}>
@@ -190,22 +204,22 @@ const CalendarScreen = () => {
           </View>
 
           <View style={{ gap: spacing.sm, marginTop: 4 }}>
-            {EVENTS.map((e) => (
+            {events.map((e) => (
               <View
                 key={e.id}
-                style={[styles.eventCard, { borderLeftColor: e.accent }]}
+                style={[styles.eventCard, { borderLeftColor: getEventAccent(e.source) }]}
               >
-                <Text style={styles.eventTime}>{e.time}</Text>
+                <Text style={styles.eventTime}>{formatEventTime(e.event_time)}</Text>
                 <Text style={styles.eventTitle}>{e.title}</Text>
                 <View
                   style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
                 >
                   <MaterialIcons
-                    name={e.icon}
+                    name={getEventIcon(e.tag)}
                     size={14}
                     color={colors.outline}
                   />
-                  <Text style={styles.eventSub}>{e.sub}</Text>
+                  <Text style={styles.eventSub}>{e.subtitle}</Text>
                 </View>
                 {e.tag && (
                   <View
