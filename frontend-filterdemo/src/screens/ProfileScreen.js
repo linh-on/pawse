@@ -26,10 +26,17 @@ import { useAuth } from "../lib/AuthContext";
 const PROFILE_AVATAR =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuDFf66XVpfWKaaPQ5VXeJ9CnLYJOuG5pYlP69zwiD95-7ggVWwsKNVDVg0MRYXrOeSAOzEAUSNJsyS1TqOOCUqs-2gF695A5eOB_AW1wzuJnPNqrBHL5GuXVZKxnk3iVrX7vCtHPR6N0Qj076KqIKaztPlX2NfbZK1cx6OTlcaRXS-R2lj-4XWqFLs5rBtVGLumb88WfswLAuaCc3iOPSfdMFNWBq0ffzO4fo9M7FYPJ5YlN70TUJHUP4X9KPHGqoW1-guyMzrgyM9B";
 
+const XP_PER_MINUTE = 2;
+const XP_PER_LEVEL = 1000;
+
 const formatBirthday = (dateString) => {
   if (!dateString) return "";
   const date = new Date(dateString + "T00:00:00");
-  return date.toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" });
+  return date.toLocaleDateString([], {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 };
 
 const toDatabaseDate = (value) => {
@@ -37,6 +44,29 @@ const toDatabaseDate = (value) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toISOString().slice(0, 10);
+};
+
+const getCurrentStreak = (sessions) => {
+  const completedDays = new Set(
+    sessions
+      .filter((s) => s.completed)
+      .map((s) => new Date(s.started_at).toDateString()),
+  );
+  let streak = 0;
+  const cursor = new Date();
+  if (!completedDays.has(cursor.toDateString())) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  while (completedDays.has(cursor.toDateString())) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+};
+
+const formatFocused = (minutes) => {
+  const hrs = Math.round(minutes / 60);
+  return `${hrs}h`;
 };
 
 const ProfileScreen = () => {
@@ -48,10 +78,49 @@ const ProfileScreen = () => {
   const [birthday, setBirthday] = useState(formatBirthday(user?.birthday));
   const email = user?.email || "";
 
+  // Computed stats from sessions
+  const [streak, setStreak] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [totalMinutes, setTotalMinutes] = useState(0);
+  const [loadingStats, setLoadingStats] = useState(true);
+
   useEffect(() => {
     setName(user?.name || "");
     setBirthday(formatBirthday(user?.birthday));
   }, [user]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user?.id) {
+        setLoadingStats(false);
+        return;
+      }
+      setLoadingStats(true);
+
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("duration_minutes, started_at, completed")
+        .eq("user_id", user.id);
+
+      if (!error && data) {
+        const completed = data.filter((s) => s.completed);
+        const mins = completed.reduce(
+          (sum, s) => sum + (s.duration_minutes || 0),
+          0,
+        );
+        const totalXP = mins * XP_PER_MINUTE;
+        const lvl = Math.floor(totalXP / XP_PER_LEVEL) + 1;
+
+        setTotalMinutes(mins);
+        setLevel(lvl);
+        setStreak(getCurrentStreak(data));
+      }
+
+      setLoadingStats(false);
+    };
+
+    fetchStats();
+  }, [user?.id]);
 
   const handleSave = async () => {
     if (!user?.id) return;
@@ -115,12 +184,27 @@ const ProfileScreen = () => {
           <Text style={styles.email}>{email}</Text>
         </View>
 
-        {/* Stats */}
+        {/* Stats — live from DB */}
         <View style={{ flexDirection: "row", gap: spacing.sm }}>
           {[
-            { v: "14", l: "DAY STREAK" },
-            { v: "12", l: "LEVEL" },
-            { v: "42h", l: "FOCUSED" },
+            {
+              v: loadingStats ? "…" : `${streak}`,
+              l: "DAY STREAK",
+              icon: "local-fire-department",
+              color: colors.secondary,
+            },
+            {
+              v: loadingStats ? "…" : `${level}`,
+              l: "LEVEL",
+              icon: "star",
+              color: colors.primary,
+            },
+            {
+              v: loadingStats ? "…" : formatFocused(totalMinutes),
+              l: "FOCUSED",
+              icon: "schedule",
+              color: colors.primaryContainer,
+            },
           ].map((s, i) => (
             <View
               key={i}
@@ -130,6 +214,7 @@ const ProfileScreen = () => {
                 { flex: 1, alignItems: "center", gap: 4, padding: spacing.sm },
               ]}
             >
+              <MaterialIcons name={s.icon} size={18} color={s.color} />
               <Text style={styles.statValue}>{s.v}</Text>
               <Text style={styles.statLabel}>{s.l}</Text>
             </View>

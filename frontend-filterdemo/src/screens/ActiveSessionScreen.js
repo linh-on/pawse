@@ -32,49 +32,41 @@ const ActiveSessionScreen = () => {
   const { durationMinutes = 45 } = route.params ?? {};
   const TOTAL_SECONDS = durationMinutes * 60;
 
-  // ESP32 box hook
   const { connected, remaining: boxRemaining, actions } = usePawseBox();
 
-  // Local fallback timer (only used when box is offline)
   const [localRemaining, setLocalRemaining] = useState(TOTAL_SECONDS);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const sessionStartedRef = useRef(false);
   const dbSessionIdRef = useRef(null);
   const sessionFinishedRef = useRef(false);
+  const hasNavigatedRef = useRef(false); // prevent double-navigate
 
   const saveNotificationLog = async (entry) => {
     if (!dbSessionIdRef.current) return;
-
     const { error } = await supabase.from("notification_logs").insert({
       session_id: dbSessionIdRef.current,
       text: entry.text,
       predicted_label: entry.predicted,
       was_allowed: entry.predicted === "urgent",
     });
-
-    if (error) {
-      console.warn("Could not save notification log:", error.message);
-    }
+    if (error) console.warn("Could not save notification log:", error.message);
   };
 
-  // Notification sim hook — wired to box actions and Supabase logs
   const sim = useNotifSimulator({
     onNotificationClassified: saveNotificationLog,
     onUrgentDetected: (entry) => {
       if (connected) actions.sendUrgent(entry.text.slice(0, 16));
     },
     onUrgentDismiss: () => {
-      if (connected) actions.respondUrgent(false); // stay locked
+      if (connected) actions.respondUrgent(false);
     },
   });
 
-  // Create a database session row when this screen opens.
+  // Create session row on mount
   useEffect(() => {
     let mounted = true;
-
     const createSession = async () => {
       if (!user?.id) return;
-
       const { data, error } = await supabase
         .from("sessions")
         .insert({
@@ -85,19 +77,13 @@ const ActiveSessionScreen = () => {
         })
         .select("id")
         .single();
-
       if (error) {
         console.warn("Could not create focus session:", error.message);
         return;
       }
-
-      if (mounted) {
-        dbSessionIdRef.current = data.id;
-      }
+      if (mounted) dbSessionIdRef.current = data.id;
     };
-
     createSession();
-
     return () => {
       mounted = false;
     };
@@ -105,23 +91,15 @@ const ActiveSessionScreen = () => {
 
   const finishDbSession = async (completed) => {
     if (!dbSessionIdRef.current || sessionFinishedRef.current) return;
-
     sessionFinishedRef.current = true;
-
     const { error } = await supabase
       .from("sessions")
-      .update({
-        ended_at: new Date().toISOString(),
-        completed,
-      })
+      .update({ ended_at: new Date().toISOString(), completed })
       .eq("id", dbSessionIdRef.current);
-
-    if (error) {
-      console.warn("Could not update focus session:", error.message);
-    }
+    if (error) console.warn("Could not update focus session:", error.message);
   };
 
-  // Tell the box to start when first connected
+  // Tell box to start when first connected
   useEffect(() => {
     if (connected && !sessionStartedRef.current) {
       actions.startSession(durationMinutes);
@@ -161,14 +139,17 @@ const ActiveSessionScreen = () => {
   const displayTime = connected ? boxRemaining : fmt(localRemaining);
   const progress = remainingSecs / TOTAL_SECONDS;
 
-  // Mark the session complete when countdown reaches zero.
+  // When timer hits zero: finish session, navigate home
   useEffect(() => {
-    if (remainingSecs <= 0) {
-      finishDbSession(true);
+    if (remainingSecs <= 0 && !hasNavigatedRef.current) {
+      hasNavigatedRef.current = true;
+      sim.clearModal();
+      finishDbSession(true).then(() => {
+        navigation.navigate("Home");
+      });
     }
   }, [remainingSecs]);
 
-  // Emergency — unlock box immediately, return to home
   async function emergencyUnlock() {
     if (connected) actions.respondUrgent(true);
     sim.clearModal();
@@ -192,7 +173,6 @@ const ActiveSessionScreen = () => {
           <Text style={styles.subtitle}>
             Your phone is tucked away for a while.
           </Text>
-
           <View style={styles.boxIndicator}>
             <View
               style={[
@@ -281,7 +261,6 @@ const styles = StyleSheet.create({
   titleBlock: { alignItems: "center", gap: 6 },
   title: { ...typography.h2, color: colors.onSurface },
   subtitle: { ...typography.bodySm, color: colors.onSurfaceVariant },
-
   boxIndicator: {
     flexDirection: "row",
     alignItems: "center",
@@ -290,7 +269,6 @@ const styles = StyleSheet.create({
   },
   boxDot: { width: 8, height: 8, borderRadius: 4 },
   boxStatus: { ...typography.labelCaps, fontSize: 10 },
-
   ringWrap: { alignItems: "center" },
   timerFace: {
     width: 240,
@@ -304,7 +282,6 @@ const styles = StyleSheet.create({
   },
   timerText: { ...typography.timerDisplay, color: colors.onPrimaryFixed },
   timerSub: { ...typography.labelCaps, color: colors.outline, marginTop: 6 },
-
   overrideBtn: { alignItems: "center", gap: 6 },
   overrideCircle: {
     width: 56,

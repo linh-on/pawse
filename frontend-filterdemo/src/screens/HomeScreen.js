@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,32 +6,29 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  TextInput,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Header from "../components/Header";
 import { colors, spacing, radii, shadows, typography } from "../theme";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
+import { Picker } from "@react-native-picker/picker";
 
 const MASCOT_HOME =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAFb7jjkY7NC_rkg3sSsGcNFn_sR9nbvDa0TNzK5TxPChSaCiPu-whKcwwYnarqWvGT2ugbEnmENbhqq7nC0PbNLUy7JnOBtcL8tgo4wH1AuTgI4C6Qtx280aMVHmlbwYDTCBJ7Z_OpC6kuI0fwt3Wm7tQMSdQckNWj9LkEoUBNMGoa-za19rKhTEwV-5A2gSPy1SuuHczBGQ-5uuSJImUrzvjDSm9wwCtb4UCC3dH9udT_9RJAH_pcH7CB3QmKWW3kArkr_DHxO3Ci";
 
-const MIN_MINUTES = 5;
-const MAX_MINUTES = 120;
-const STEP = 5;
-
-const PREP_ITEMS = [
-  { id: 1, label: "Silence phone notifications" },
-  { id: 2, label: "Grab a glass of water" },
-  { id: 3, label: "Ready the noise-cancelling headphones" },
+const DEFAULT_PREP = [
+  { label: "Silence phone notifications" },
+  { label: "Grab a glass of water" },
+  { label: "Ready the noise-cancelling headphones" },
 ];
 
 const formatMinutes = (minutes) => {
   const hrs = Math.floor(minutes / 60);
   const mins = minutes % 60;
-
   if (hrs > 0 && mins > 0) return `${hrs}h ${mins}m`;
   if (hrs > 0) return `${hrs}h`;
   return `${mins}m`;
@@ -43,53 +40,65 @@ const getCurrentStreak = (sessions) => {
       .filter((s) => s.completed)
       .map((s) => new Date(s.started_at).toDateString()),
   );
-
   let streak = 0;
   const cursor = new Date();
-
   if (!completedDays.has(cursor.toDateString())) {
     cursor.setDate(cursor.getDate() - 1);
   }
-
   while (completedDays.has(cursor.toDateString())) {
     streak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
-
   return streak;
 };
 
-// Full ring dial — solid color, no moving parts
-const FocusDial = ({ minutes }) => (
-  <View style={dialStyles.wrapper}>
-    <View style={dialStyles.ring}>
-      <View style={dialStyles.face}>
-        <Text style={dialStyles.number}>{minutes}</Text>
-        <Text style={dialStyles.unit}>MINS</Text>
+const FocusDial = ({ minutes, onChange }) => {
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const hours = Array.from({ length: 9 }, (_, i) => i);
+  const minuteOptions = Array.from({ length: 60 }, (_, i) => i);
+
+  const handleHourChange = (v) => onChange(Math.max(1, v * 60 + mins));
+  const handleMinChange = (v) => onChange(Math.max(1, hrs * 60 + v));
+
+  return (
+    <View style={dialStyles.wrapper}>
+      <View style={dialStyles.row}>
+        <View style={dialStyles.column}>
+          <Picker
+            selectedValue={hrs}
+            onValueChange={handleHourChange}
+            style={dialStyles.picker}
+            itemStyle={dialStyles.pickerItem}
+          >
+            {hours.map((h) => (
+              <Picker.Item key={h} label={`${h} hr`} value={h} />
+            ))}
+          </Picker>
+        </View>
+        <View style={dialStyles.column}>
+          <Picker
+            selectedValue={mins}
+            onValueChange={handleMinChange}
+            style={dialStyles.picker}
+            itemStyle={dialStyles.pickerItem}
+          >
+            {minuteOptions.map((m) => (
+              <Picker.Item key={m} label={`${m} min`} value={m} />
+            ))}
+          </Picker>
+        </View>
       </View>
     </View>
-  </View>
-);
+  );
+};
 
 const dialStyles = StyleSheet.create({
-  wrapper: { alignItems: "center", justifyContent: "center" },
-  ring: {
-    width: 148,
-    height: 148,
-    borderRadius: radii.full,
-    borderWidth: 10,
-    borderColor: colors.primaryContainer,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  face: { alignItems: "center" },
-  number: { ...typography.h1, color: colors.warmBrown, lineHeight: 36 },
-  unit: {
-    ...typography.labelCaps,
-    color: colors.onSurfaceVariant,
-    marginTop: 2,
-  },
+  wrapper: { width: "100%", alignItems: "center" },
+  row: { flexDirection: "row", width: "100%" },
+  column: { flex: 1 },
+  picker: { width: "100%" },
+  pickerItem: { ...typography.h2, color: colors.warmBrown, fontSize: 20 },
 });
 
 const HomeScreen = () => {
@@ -101,62 +110,124 @@ const HomeScreen = () => {
   const [todayMinutes, setTodayMinutes] = useState(0);
   const [streak, setStreak] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
-  const [checkedItems, setCheckedItems] = useState({
-    1: true,
-    2: false,
-    3: false,
-  });
+  const [prepItems, setPrepItems] = useState([]);
+  const [checkedItems, setCheckedItems] = useState({});
+  const [editMode, setEditMode] = useState(false);
 
-  useEffect(() => {
-    const fetchHomeStats = async () => {
-      if (!user?.id) {
-        setLoadingStats(false);
-        return;
-      }
-
-      setLoadingStats(true);
-
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const { data, error } = await supabase
-        .from("sessions")
-        .select("id, duration_minutes, started_at, completed")
-        .eq("user_id", user.id)
-        .order("started_at", { ascending: false });
-
-      if (!error && data) {
-        const todayTotal = data
-          .filter((session) => {
-            const startedAt = new Date(session.started_at);
-            return session.completed && startedAt >= todayStart;
-          })
-          .reduce((sum, session) => sum + (session.duration_minutes || 0), 0);
-
-        setTodayMinutes(todayTotal);
-        setStreak(getCurrentStreak(data));
-      }
-
+  const fetchHomeStats = useCallback(async () => {
+    if (!user?.id) {
       setLoadingStats(false);
-    };
-
-    fetchHomeStats();
+      return;
+    }
+    setLoadingStats(true);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("id, duration_minutes, started_at, completed")
+      .eq("user_id", user.id)
+      .order("started_at", { ascending: false });
+    if (!error && data) {
+      const todayTotal = data
+        .filter((s) => s.completed && new Date(s.started_at) >= todayStart)
+        .reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+      setTodayMinutes(todayTotal);
+      setStreak(getCurrentStreak(data));
+    }
+    setLoadingStats(false);
   }, [user?.id]);
 
-  const adjustMinutes = (delta) => {
-    setMinutes((prev) =>
-      Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, prev + delta)),
+  // Re-fetch stats every time the screen is focused (including returning from ActiveSession)
+  useFocusEffect(
+    useCallback(() => {
+      fetchHomeStats();
+    }, [fetchHomeStats]),
+  );
+
+  useEffect(() => {
+    const fetchPrep = async () => {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from("quick_prep_items")
+        .select("id, label, sort_order")
+        .eq("user_id", user.id)
+        .order("sort_order", { ascending: true });
+      if (!error && data && data.length > 0) {
+        setPrepItems(data);
+        setCheckedItems({ [data[0].id]: true });
+      } else {
+        const defaults = DEFAULT_PREP.map((p, i) => ({
+          id: `default-${i}`,
+          label: p.label,
+          sort_order: i,
+        }));
+        setPrepItems(defaults);
+        setCheckedItems({ "default-0": true });
+      }
+    };
+    fetchPrep();
+  }, [user?.id]);
+
+  const toggleCheck = (id) =>
+    setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  const updateLabel = (id, text) =>
+    setPrepItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, label: text } : item)),
     );
+
+  const deleteItem = async (id) => {
+    setPrepItems((prev) => prev.filter((item) => item.id !== id));
+    if (!String(id).startsWith("default-")) {
+      await supabase.from("quick_prep_items").delete().eq("id", id);
+    }
   };
 
-  const toggleCheck = (id) => {
-    setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
+  const addItem = () => {
+    const tempId = `new-${Date.now()}`;
+    setPrepItems((prev) => [
+      ...prev,
+      { id: tempId, label: "", sort_order: prev.length },
+    ]);
+  };
+
+  const saveEdits = async () => {
+    if (!user?.id) {
+      setEditMode(false);
+      return;
+    }
+    const saved = [];
+    for (let i = 0; i < prepItems.length; i++) {
+      const item = prepItems[i];
+      const label = item.label.trim();
+      if (!label) continue;
+      if (
+        String(item.id).startsWith("default-") ||
+        String(item.id).startsWith("new-")
+      ) {
+        const { data, error } = await supabase
+          .from("quick_prep_items")
+          .insert({ user_id: user.id, label, sort_order: i })
+          .select("id, label, sort_order")
+          .single();
+        if (!error && data) saved.push(data);
+      } else {
+        const { data, error } = await supabase
+          .from("quick_prep_items")
+          .update({ label, sort_order: i })
+          .eq("id", item.id)
+          .select("id, label, sort_order")
+          .single();
+        if (!error && data) saved.push(data);
+      }
+    }
+    setPrepItems(saved);
+    setEditMode(false);
   };
 
   return (
     <View style={styles.screen}>
       <Header mascotSrc={MASCOT_HOME} />
-
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -205,73 +276,95 @@ const HomeScreen = () => {
           <View style={styles.sessionHeader}>
             <Text style={styles.sessionTitle}>Focus Duration</Text>
             <View style={styles.minutesBadge}>
-              <Text style={styles.minutesBadgeText}>{minutes} Mins</Text>
+              <Text style={styles.minutesBadgeText}>
+                {formatMinutes(minutes)}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.dialRow}>
-            <TouchableOpacity
-              style={styles.adjustBtn}
-              onPress={() => adjustMinutes(-STEP)}
-              disabled={minutes <= MIN_MINUTES}
-            >
-              <MaterialIcons
-                name="remove"
-                size={22}
-                color={
-                  minutes <= MIN_MINUTES
-                    ? colors.outlineVariant
-                    : colors.primary
-                }
-              />
-            </TouchableOpacity>
-            <FocusDial minutes={minutes} />
-            <TouchableOpacity
-              style={styles.adjustBtn}
-              onPress={() => adjustMinutes(STEP)}
-              disabled={minutes >= MAX_MINUTES}
-            >
-              <MaterialIcons
-                name="add"
-                size={22}
-                color={
-                  minutes >= MAX_MINUTES
-                    ? colors.outlineVariant
-                    : colors.primary
-                }
-              />
-            </TouchableOpacity>
-          </View>
+          <FocusDial minutes={minutes} onChange={setMinutes} />
 
           <View style={styles.prepSection}>
-            <Text style={styles.prepTitle}>Quick Prep</Text>
-            {PREP_ITEMS.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.prepRow}
-                onPress={() => toggleCheck(item.id)}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.checkbox,
-                    checkedItems[item.id] && styles.checkboxChecked,
-                  ]}
+            <View style={styles.prepHeader}>
+              <Text style={styles.prepTitle}>Quick Prep</Text>
+              {editMode ? (
+                <TouchableOpacity onPress={saveEdits} style={styles.editBtn}>
+                  <MaterialIcons
+                    name="check"
+                    size={15}
+                    color={colors.onPrimaryContainer}
+                  />
+                  <Text style={styles.editBtnText}>Done</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setEditMode(true)}
+                  style={styles.editBtnGhost}
                 >
-                  {checkedItems[item.id] && (
-                    <MaterialIcons name="check" size={14} color="#fff" />
-                  )}
+                  <MaterialIcons name="edit" size={14} color={colors.primary} />
+                  <Text style={styles.editBtnGhostText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {prepItems.map((item) =>
+              editMode ? (
+                <View key={item.id} style={styles.editRow}>
+                  <MaterialIcons
+                    name="drag-handle"
+                    size={20}
+                    color={colors.outlineVariant}
+                  />
+                  <TextInput
+                    style={styles.editInput}
+                    value={item.label}
+                    onChangeText={(t) => updateLabel(item.id, t)}
+                    placeholder="Add a prep step..."
+                    placeholderTextColor={colors.outlineVariant}
+                  />
+                  <TouchableOpacity onPress={() => deleteItem(item.id)}>
+                    <MaterialIcons
+                      name="close"
+                      size={18}
+                      color={colors.error}
+                    />
+                  </TouchableOpacity>
                 </View>
-                <Text
-                  style={[
-                    styles.prepLabel,
-                    checkedItems[item.id] && styles.prepLabelChecked,
-                  ]}
+              ) : (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.prepRow}
+                  onPress={() => toggleCheck(item.id)}
+                  activeOpacity={0.7}
                 >
-                  {item.label}
-                </Text>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      checkedItems[item.id] && styles.checkboxChecked,
+                    ]}
+                  >
+                    {checkedItems[item.id] && (
+                      <MaterialIcons name="check" size={14} color="#fff" />
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.prepLabel,
+                      checkedItems[item.id] && styles.prepLabelChecked,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ),
+            )}
+
+            {editMode && (
+              <TouchableOpacity style={styles.addItemBtn} onPress={addItem}>
+                <MaterialIcons name="add" size={16} color={colors.primary} />
+                <Text style={styles.addItemText}>Add item</Text>
               </TouchableOpacity>
-            ))}
+            )}
           </View>
 
           <TouchableOpacity
@@ -356,22 +449,44 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: "700",
   },
-  dialRow: {
+  prepSection: { gap: spacing.sm },
+  prepHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.lg,
+    justifyContent: "space-between",
   },
-  adjustBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.full,
-    backgroundColor: `${colors.orange}18`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  prepSection: { gap: spacing.sm },
   prepTitle: { ...typography.h3, fontSize: 16, color: colors.warmBrown },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.primaryContainer,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radii.full,
+  },
+  editBtnText: {
+    ...typography.bodySm,
+    color: colors.onPrimaryContainer,
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  editBtnGhost: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: `${colors.primary}40`,
+  },
+  editBtnGhostText: {
+    ...typography.bodySm,
+    color: colors.primary,
+    fontWeight: "700",
+    fontSize: 12,
+  },
   prepRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -398,6 +513,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   prepLabelChecked: { color: colors.onSurface, fontWeight: "600" },
+  editRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: 4,
+  },
+  editInput: {
+    flex: 1,
+    ...typography.bodyMd,
+    fontSize: 14,
+    color: colors.onSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.outlineVariant,
+    paddingVertical: 4,
+  },
+  addItemBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  addItemText: {
+    ...typography.bodySm,
+    color: colors.primary,
+    fontWeight: "700",
+  },
   startBtn: {
     flexDirection: "row",
     alignItems: "center",

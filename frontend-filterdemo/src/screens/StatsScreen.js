@@ -22,34 +22,104 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
-
-const GRID = [
-  [1, 2, 0, 1, 3, 2, 1],
-  [2, 3, 2, 1, 2, 3, 2],
-  [0, 1, 2, 3, 2, 1, 0],
-  [1, 2, 1, 0, 1, 2, 3],
-  [2, 1, 0, 1, 2, 3, 2],
-  [3, 2, 1, 2, 1, 0, 1],
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
-const REWARDS = [
-  { name: "Tiny Sprout", icon: "local-florist", unlocked: true },
-  { name: "Lo-Fi Beanie", icon: "headset", unlocked: true },
-  { name: "Level 19", icon: "lock", unlocked: false },
-  { name: "Warm Cocoa", icon: "local-cafe", unlocked: true },
-  { name: "Comfy Scarf", icon: "favorite", unlocked: true },
-  { name: "Level 24", icon: "lock", unlocked: false },
-  { name: "Sleepy Bug", icon: "nightlight", unlocked: true },
-  { name: "Level 28", icon: "lock", unlocked: false },
-  { name: "Level 30", icon: "lock", unlocked: false },
+const XP_PER_MINUTE = 2;
+const XP_PER_LEVEL = 1000;
+
+// Earliest week allowed (Jan 1 2026)
+const MIN_DATE = new Date("2026-01-01T00:00:00");
+
+const REWARD_DEFS = [
+  { name: "Tiny Sprout", icon: "local-florist", minLevel: 1 },
+  { name: "Lo-Fi Beanie", icon: "headset", minLevel: 2 },
+  { name: "Warm Cocoa", icon: "local-cafe", minLevel: 5 },
+  { name: "Comfy Scarf", icon: "favorite", minLevel: 10 },
+  { name: "Sleepy Bug", icon: "nightlight", minLevel: 15 },
+  { name: "Level 19", icon: "lock", minLevel: 19 },
+  { name: "Level 24", icon: "lock", minLevel: 24 },
+  { name: "Level 28", icon: "lock", minLevel: 28 },
+  { name: "Level 30", icon: "lock", minLevel: 30 },
 ];
 
 const MASCOT =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAFb7jjkY7NC_rkg3sSsGcNFn_sR9nbvDa0TNzK5TxPChSaCiPu-whKcwwYnarqWvGT2ugbEnmENbhqq7nC0PbNLUy7JnOBtcL8tgo4wH1AuTgI4C6Qtx280aMVHmlbwYDTCBJ7Z_OpC6kuI0fwt3Wm7tQMSdQckNWj9LkEoUBNMGoa-za19rKhTEwV-5A2gSPy1SuuHczBGQ-5uuSJImUrzvjDSm9wwCtb4UCC3dH9udT_9RJAH_pcH7CB3QmKWW3kArkr_DHxO3Ci";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Monday of the week that is `offset` weeks from the current week. */
+const getWeekStart = (offset) => {
+  const today = new Date();
+  const daysFromMonday = (today.getDay() + 6) % 7; // Mon=0 … Sun=6
+  const d = new Date(today);
+  d.setDate(today.getDate() - daysFromMonday + offset * 7);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const getWeekEnd = (weekStart) => {
+  const d = new Date(weekStart);
+  d.setDate(weekStart.getDate() + 7);
+  return d;
+};
+
+const fmtDate = (d) =>
+  d.toLocaleDateString([], { month: "short", day: "numeric" });
+
+const getWeekLabel = (offset) => {
+  if (offset === 0) return "This Week";
+  if (offset === -1) return "Last Week";
+  const ws = getWeekStart(offset);
+  const we = new Date(ws);
+  we.setDate(ws.getDate() + 6);
+  return `${fmtDate(ws)} – ${fmtDate(we)}`;
+};
+
+/**
+ * Returns [0..1] bar heights for each of the 7 days in the given week,
+ * plus the total focused minutes for that week.
+ */
+const buildWeekData = (sessions, weekOffset) => {
+  const weekStart = getWeekStart(weekOffset);
+  const weekEnd = getWeekEnd(weekStart);
+  const totals = Array(7).fill(0);
+
+  sessions
+    .filter((s) => s.completed)
+    .forEach((s) => {
+      const date = new Date(s.started_at);
+      if (date >= weekStart && date < weekEnd) {
+        const index = Math.floor((date - weekStart) / (1000 * 60 * 60 * 24));
+        if (index >= 0 && index < 7) totals[index] += s.duration_minutes || 0;
+      }
+    });
+
+  const weekMinutes = totals.reduce((a, b) => a + b, 0);
+  const max = Math.max(...totals, 1);
+  const bars = totals.map((v) => Math.max(v / max, v > 0 ? 0.12 : 0));
+  return { bars, weekMinutes };
+};
+
 const formatHours = (minutes) => {
-  const hours = minutes / 60;
-  return hours.toFixed(hours >= 10 ? 0 : 1) + " hrs total";
+  if (minutes === 0) return "No sessions";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
 };
 
 const getCurrentStreak = (sessions) => {
@@ -58,25 +128,19 @@ const getCurrentStreak = (sessions) => {
       .filter((s) => s.completed)
       .map((s) => new Date(s.started_at).toDateString()),
   );
-
   let streak = 0;
   const cursor = new Date();
-
-  if (!completedDays.has(cursor.toDateString())) {
+  if (!completedDays.has(cursor.toDateString()))
     cursor.setDate(cursor.getDate() - 1);
-  }
-
   while (completedDays.has(cursor.toDateString())) {
     streak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
-
   return streak;
 };
 
 const getPeakFocusHour = (sessions) => {
   const totalsByHour = {};
-
   sessions
     .filter((s) => s.completed)
     .forEach((s) => {
@@ -84,36 +148,47 @@ const getPeakFocusHour = (sessions) => {
       totalsByHour[hour] =
         (totalsByHour[hour] || 0) + (s.duration_minutes || 0);
     });
-
   const peak = Object.entries(totalsByHour).sort((a, b) => b[1] - a[1])[0];
   if (!peak) return "--";
-
-  const date = new Date();
-  date.setHours(Number(peak[0]), 0, 0, 0);
-
-  return date.toLocaleTimeString([], { hour: "numeric" });
+  const d = new Date();
+  d.setHours(Number(peak[0]), 0, 0, 0);
+  return d.toLocaleTimeString([], { hour: "numeric" });
 };
 
-const buildWeekData = (sessions) => {
-  const totals = Array(7).fill(0);
-  const today = new Date();
-
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay() + 1);
-  weekStart.setHours(0, 0, 0, 0);
-
+const buildMonthGrid = (sessions, year, month) => {
+  const minutesByDay = {};
   sessions
     .filter((s) => s.completed)
     .forEach((s) => {
-      const date = new Date(s.started_at);
-      const index = Math.floor((date - weekStart) / (1000 * 60 * 60 * 24));
-      if (index >= 0 && index < 7) {
-        totals[index] += s.duration_minutes || 0;
-      }
+      // Use local date, not UTC (toISOString gives UTC which can be off by 1 day)
+      const d2 = new Date(s.started_at);
+      const key = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+      minutesByDay[key] = (minutesByDay[key] || 0) + (s.duration_minutes || 0);
     });
 
-  const max = Math.max(...totals, 1);
-  return totals.map((value) => Math.max(value / max, value > 0 ? 0.12 : 0));
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+  const leadingEmpties = (firstDow + 6) % 7;
+
+  const cells = [];
+  for (let i = 0; i < leadingEmpties; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const mins = minutesByDay[key] || 0;
+    let intensity = 0;
+    if (mins >= 60) intensity = 3;
+    else if (mins >= 30) intensity = 2;
+    else if (mins > 0) intensity = 1;
+    cells.push({ day: d, intensity });
+  }
+
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    const row = cells.slice(i, i + 7);
+    while (row.length < 7) row.push(null);
+    rows.push(row);
+  }
+  return rows;
 };
 
 function cellColor(intensity) {
@@ -127,47 +202,29 @@ function cellColor(intensity) {
 
 const formatTime = (dateString) => {
   if (!dateString) return "";
-
   const date = new Date(dateString);
   const today = new Date();
-
-  if (date.toDateString() === today.toDateString()) {
-    return date.toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-
+  if (date.toDateString() === today.toDateString())
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
-
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  }
-
-  return date.toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-  });
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
 };
 
 const buildLogItems = (sessions) => {
   const items = [];
-
   sessions.forEach((session) => {
     const urgentLogs =
       session.notification_logs?.filter(
         (log) => log.predicted_label === "urgent" && log.was_allowed,
       ) || [];
-
     urgentLogs.forEach((log) => {
       const text = log.text || "";
-      const lowerText = text.toLowerCase();
       const isCall =
-        lowerText.includes("call") ||
-        lowerText.includes("mom") ||
-        lowerText.includes("dad");
-
+        text.toLowerCase().includes("call") ||
+        text.toLowerCase().includes("mom") ||
+        text.toLowerCase().includes("dad");
       items.push({
         id: `log-${log.id}`,
         type: "override",
@@ -181,7 +238,6 @@ const buildLogItems = (sessions) => {
         sortTime: new Date(log.fired_at || session.started_at).getTime(),
       });
     });
-
     if (session.completed) {
       items.push({
         id: `complete-${session.id}`,
@@ -210,9 +266,10 @@ const buildLogItems = (sessions) => {
       });
     }
   });
-
   return items.sort((a, b) => b.sortTime - a.sortTime).slice(0, 30);
 };
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const StatsScreen = () => {
   const insets = useSafeAreaInsets();
@@ -222,79 +279,99 @@ const StatsScreen = () => {
   const [sessions, setSessions] = useState([]);
   const [logFilter, setLogFilter] = useState("all");
 
+  // Week navigation (0 = current week, negative = past)
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  // Month grid navigation
+  const now = new Date();
+  const [gridYear, setGridYear] = useState(now.getFullYear());
+  const [gridMonth, setGridMonth] = useState(now.getMonth());
+
   useEffect(() => {
     const fetchSessions = async () => {
       if (!user?.id) return;
-
       const { data, error } = await supabase
         .from("sessions")
         .select(
           `
-          id,
-          duration_minutes,
-          started_at,
-          ended_at,
-          completed,
-          notification_logs (
-            id,
-            text,
-            predicted_label,
-            was_allowed,
-            fired_at
-          )
+          id, duration_minutes, started_at, ended_at, completed,
+          notification_logs (id, text, predicted_label, was_allowed, fired_at)
         `,
         )
         .eq("user_id", user.id)
         .order("started_at", { ascending: false });
-
-      if (!error && data) {
-        setSessions(data);
-      }
+      if (!error && data) setSessions(data);
     };
-
     fetchSessions();
   }, [user?.id]);
 
-  const completedMinutes = sessions
-    .filter((session) => session.completed)
-    .reduce((sum, session) => sum + (session.duration_minutes || 0), 0);
+  // ── Week navigation bounds ──
+  const canGoBack = getWeekStart(weekOffset - 1) >= MIN_DATE;
+  const canGoForward = weekOffset < 0;
 
-  const weekData = buildWeekData(sessions);
+  // ── Month navigation bounds ──
+  const isCurrentMonth =
+    gridYear === now.getFullYear() && gridMonth === now.getMonth();
+  const goToPrevMonth = () => {
+    if (gridMonth === 0) {
+      setGridMonth(11);
+      setGridYear((y) => y - 1);
+    } else setGridMonth((m) => m - 1);
+  };
+  const goToNextMonth = () => {
+    if (isCurrentMonth) return;
+    if (gridMonth === 11) {
+      setGridMonth(0);
+      setGridYear((y) => y + 1);
+    } else setGridMonth((m) => m + 1);
+  };
+
+  // ── Derived stats ──
+  const completedMinutes = sessions
+    .filter((s) => s.completed)
+    .reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+
+  const { bars: weekBars, weekMinutes } = buildWeekData(sessions, weekOffset);
   const streak = getCurrentStreak(sessions);
   const peakFocus = getPeakFocusHour(sessions);
+  const grid = buildMonthGrid(sessions, gridYear, gridMonth);
+
+  const totalXP = completedMinutes * XP_PER_MINUTE;
+  const level = Math.floor(totalXP / XP_PER_LEVEL) + 1;
+  const xpInLevel = totalXP % XP_PER_LEVEL;
+  const xpProgress = xpInLevel / XP_PER_LEVEL;
+  const rewards = REWARD_DEFS.map((r) => ({
+    ...r,
+    unlocked: level >= r.minLevel,
+  }));
 
   const allLogItems = buildLogItems(sessions);
   const visibleLogItems = allLogItems.filter((item) => {
     if (logFilter === "all") return true;
-    if (logFilter === "overrides") {
+    if (logFilter === "overrides")
       return item.type === "override" || item.type === "unlock";
-    }
     if (logFilter === "completed") return item.type === "completed";
     return true;
   });
-
   const overrideCount = allLogItems.filter(
     (item) => item.type === "override" || item.type === "unlock",
   ).length;
-
   const completedCount = allLogItems.filter(
     (item) => item.type === "completed",
   ).length;
-
   const focusShieldRate =
     allLogItems.length === 0
       ? 0
       : Math.round((completedCount / allLogItems.length) * 100);
 
+  // ── Render ──
   const renderStats = () => (
     <>
       <View style={{ flexDirection: "row", gap: spacing.sm }}>
         <View style={[styles.peakCard, shadows.card]}>
           <Text style={styles.peakLabel}>PEAK FOCUS</Text>
           <Text style={styles.peakValue}>{peakFocus}</Text>
-          <Text style={styles.peakDelta}>↗ +12% vs last week</Text>
         </View>
-
         <View style={[styles.streakCard, shadows.card]}>
           <Text style={styles.streakLabel}>CURRENT STREAK</Text>
           <View
@@ -304,19 +381,54 @@ const StatsScreen = () => {
             <Text style={styles.streakUnit}>days</Text>
           </View>
           <View style={styles.streakBar}>
-            <View style={styles.streakBarFill} />
+            <View
+              style={[
+                styles.streakBarFill,
+                { width: `${Math.min(streak / 30, 1) * 100}%` },
+              ]}
+            />
           </View>
         </View>
       </View>
 
+      {/* Weekly Focus — navigable */}
       <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
+        {/* Week header */}
         <View style={patterns.rowBetween}>
           <Text style={styles.cardTitle}>Weekly Focus</Text>
-          <Text style={styles.cardMeta}>{formatHours(completedMinutes)}</Text>
+          <Text style={styles.cardMeta}>{formatHours(weekMinutes)}</Text>
+        </View>
+
+        <View style={styles.weekNav}>
+          <TouchableOpacity
+            style={[styles.weekArrow, !canGoBack && { opacity: 0.3 }]}
+            onPress={() => canGoBack && setWeekOffset((o) => o - 1)}
+            disabled={!canGoBack}
+          >
+            <MaterialIcons
+              name="chevron-left"
+              size={20}
+              color={colors.warmBrown}
+            />
+          </TouchableOpacity>
+
+          <Text style={styles.weekLabel}>{getWeekLabel(weekOffset)}</Text>
+
+          <TouchableOpacity
+            style={[styles.weekArrow, !canGoForward && { opacity: 0.3 }]}
+            onPress={() => canGoForward && setWeekOffset((o) => o + 1)}
+            disabled={!canGoForward}
+          >
+            <MaterialIcons
+              name="chevron-right"
+              size={20}
+              color={colors.warmBrown}
+            />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.chartArea}>
-          {weekData.map((v, i) => (
+          {weekBars.map((v, i) => (
             <View key={i} style={styles.chartCol}>
               <View style={[styles.chartBar, { height: `${v * 100}%` }]} />
             </View>
@@ -332,36 +444,73 @@ const StatsScreen = () => {
         </View>
       </View>
 
+      {/* Consistency Grid — month view */}
       <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
         <View style={patterns.rowBetween}>
-          <Text style={styles.cardTitle}>Consistency Grid</Text>
-          <View style={{ flexDirection: "row", gap: 3 }}>
-            {[0, 1, 2, 3].map((i) => (
-              <View
-                key={i}
-                style={[styles.legendCell, { backgroundColor: cellColor(i) }]}
-              />
-            ))}
-          </View>
+          <TouchableOpacity onPress={goToPrevMonth} style={styles.monthArrow}>
+            <MaterialIcons
+              name="chevron-left"
+              size={22}
+              color={colors.warmBrown}
+            />
+          </TouchableOpacity>
+          <Text style={styles.monthName}>
+            {MONTH_NAMES[gridMonth]} {gridYear}
+          </Text>
+          <TouchableOpacity
+            onPress={goToNextMonth}
+            style={[styles.monthArrow, isCurrentMonth && { opacity: 0.3 }]}
+            disabled={isCurrentMonth}
+          >
+            <MaterialIcons
+              name="chevron-right"
+              size={22}
+              color={colors.warmBrown}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.legendRow}>
+          <Text style={styles.legendLabel}>Less</Text>
+          {[0, 1, 2, 3].map((i) => (
+            <View
+              key={i}
+              style={[styles.legendCell, { backgroundColor: cellColor(i) }]}
+            />
+          ))}
+          <Text style={styles.legendLabel}>More</Text>
+        </View>
+
+        <View style={styles.dowRow}>
+          {DAYS.map((d, i) => (
+            <Text key={i} style={styles.dowLabel}>
+              {d}
+            </Text>
+          ))}
         </View>
 
         <View style={{ gap: 4 }}>
-          {GRID.map((row, ri) => (
+          {grid.map((row, ri) => (
             <View key={ri} style={{ flexDirection: "row", gap: 4 }}>
-              {row.map((cell, ci) => (
-                <View
-                  key={ci}
-                  style={[
-                    styles.gridCell,
-                    { backgroundColor: cellColor(cell) },
-                  ]}
-                />
-              ))}
+              {row.map((cell, ci) =>
+                cell === null ? (
+                  <View key={ci} style={styles.gridCell} />
+                ) : (
+                  <View
+                    key={ci}
+                    style={[
+                      styles.gridCell,
+                      { backgroundColor: cellColor(cell.intensity) },
+                    ]}
+                  />
+                ),
+              )}
             </View>
           ))}
         </View>
       </View>
 
+      {/* XP / Mascot */}
       <View style={[patterns.card, shadows.card, { gap: spacing.gutter }]}>
         <View
           style={{
@@ -373,31 +522,35 @@ const StatsScreen = () => {
           <View style={styles.mascotAvatar}>
             <Image source={{ uri: MASCOT }} style={styles.mascotImg} />
             <View style={styles.levelBadge}>
-              <Text style={styles.levelText}>12</Text>
+              <Text style={styles.levelText}>{level}</Text>
             </View>
           </View>
-
           <View style={{ flex: 1 }}>
             <Text style={styles.mascotName}>Mochi the{"\n"}Calico</Text>
             <Text style={styles.xpLabel}>XP Progress</Text>
-
             <View style={{ gap: 4, marginTop: 4 }}>
               <View style={styles.xpBar}>
-                <View style={[styles.xpBarFill, { width: "78%" }]} />
+                <View
+                  style={[
+                    styles.xpBarFill,
+                    { width: `${Math.round(xpProgress * 100)}%` },
+                  ]}
+                />
               </View>
-              <Text style={styles.xpText}>780 / 1000</Text>
+              <Text style={styles.xpText}>
+                {xpInLevel} / {XP_PER_LEVEL}
+              </Text>
             </View>
           </View>
         </View>
-
         <View style={styles.rewardGrid}>
-          {REWARDS.map((r, i) => (
+          {rewards.map((r, i) => (
             <View
               key={i}
               style={[styles.rewardCell, !r.unlocked && styles.rewardLocked]}
             >
               <MaterialIcons
-                name={r.icon}
+                name={r.unlocked ? r.icon : "lock"}
                 size={22}
                 color={r.unlocked ? colors.primary : colors.outlineVariant}
               />
@@ -480,7 +633,6 @@ const StatsScreen = () => {
                     color={item.type === "completed" ? "#1F8A3F" : colors.error}
                   />
                 </View>
-
                 <View style={{ flex: 1 }}>
                   <Text style={styles.logTitle}>{item.title}</Text>
                   <Text
@@ -494,16 +646,13 @@ const StatsScreen = () => {
                     {item.status}
                   </Text>
                 </View>
-
                 <Text style={styles.logTime}>{item.time}</Text>
               </View>
-
               {item.description && (
                 <View style={styles.descriptionBox}>
                   <Text style={styles.descriptionText}>{item.description}</Text>
                 </View>
               )}
-
               <View style={styles.logFooter}>
                 <View style={styles.footerItem}>
                   <MaterialIcons
@@ -513,7 +662,6 @@ const StatsScreen = () => {
                   />
                   <Text style={styles.footerText}>{item.duration}</Text>
                 </View>
-
                 <View style={styles.footerItem}>
                   <MaterialIcons
                     name={item.type === "completed" ? "emoji-events" : "apps"}
@@ -538,7 +686,6 @@ const StatsScreen = () => {
           <Text style={styles.summaryValue}>{focusShieldRate}%</Text>
           <Text style={styles.summaryLabel}>Focus Shield Rate</Text>
         </View>
-
         <View style={[styles.summaryCard, shadows.card]}>
           <MaterialIcons
             name="settings-backup-restore"
@@ -555,7 +702,6 @@ const StatsScreen = () => {
   return (
     <View style={patterns.screen}>
       <Header />
-
       <ScrollView
         contentContainerStyle={[
           patterns.scrollContent,
@@ -574,7 +720,6 @@ const StatsScreen = () => {
               Stats
             </Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.tab, tab === "log" && styles.tabActive]}
             onPress={() => setTab("log")}
@@ -586,7 +731,6 @@ const StatsScreen = () => {
             </Text>
           </TouchableOpacity>
         </View>
-
         {tab === "stats" ? renderStats() : renderLog()}
       </ScrollView>
     </View>
@@ -606,17 +750,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: radii.full,
   },
-  tabActive: {
-    backgroundColor: colors.surfaceContainerHigh,
-  },
-  tabText: {
-    ...typography.bodyMd,
-    color: colors.outline,
-    fontWeight: "600",
-  },
-  tabTextActive: {
-    color: colors.warmBrown,
-  },
+  tabActive: { backgroundColor: colors.surfaceContainerHigh },
+  tabText: { ...typography.bodyMd, color: colors.outline, fontWeight: "600" },
+  tabTextActive: { color: colors.warmBrown },
 
   peakCard: {
     flex: 1,
@@ -629,7 +765,6 @@ const styles = StyleSheet.create({
   },
   peakLabel: { ...typography.labelCaps, color: colors.primary, fontSize: 9 },
   peakValue: { ...typography.h2, fontSize: 22, color: colors.warmBrown },
-  peakDelta: { ...typography.bodySm, fontSize: 11, color: colors.primary },
 
   streakCard: {
     flex: 1,
@@ -654,7 +789,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   streakBarFill: {
-    width: "70%",
     height: "100%",
     backgroundColor: colors.secondary,
     borderRadius: 2,
@@ -662,6 +796,30 @@ const styles = StyleSheet.create({
 
   cardTitle: { ...typography.h3, fontSize: 16, color: colors.warmBrown },
   cardMeta: { ...typography.bodySm, fontSize: 12, color: colors.outline },
+
+  // Week navigation
+  weekNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.lg,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  weekArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.full,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  weekLabel: {
+    ...typography.bodySm,
+    fontSize: 12,
+    color: colors.warmBrown,
+    fontWeight: "600",
+  },
 
   chartArea: {
     height: 100,
@@ -683,9 +841,35 @@ const styles = StyleSheet.create({
     color: colors.outline,
   },
 
+  // Month grid
+  monthName: { ...typography.h3, fontSize: 16, color: colors.warmBrown },
+  monthArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainerLow,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-end",
+  },
+  legendLabel: { ...typography.labelCaps, fontSize: 9, color: colors.outline },
   legendCell: { width: 12, height: 12, borderRadius: 2 },
+  dowRow: { flexDirection: "row", gap: 4, marginBottom: 2 },
+  dowLabel: {
+    flex: 1,
+    textAlign: "center",
+    ...typography.labelCaps,
+    fontSize: 9,
+    color: colors.outline,
+  },
   gridCell: { flex: 1, aspectRatio: 1, borderRadius: 4 },
 
+  // XP
   mascotAvatar: { position: "relative" },
   mascotImg: {
     width: 70,
@@ -731,7 +915,6 @@ const styles = StyleSheet.create({
     color: colors.outline,
     alignSelf: "flex-end",
   },
-
   rewardGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -756,6 +939,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
+  // Log
   eyebrow: { ...typography.labelCaps, fontSize: 10, color: colors.primary },
   title: { ...typography.h1, fontSize: 26, color: colors.warmBrown },
   subtitle: {
@@ -764,12 +948,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 18,
   },
-
-  filterRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: spacing.sm,
-  },
+  filterRow: { flexDirection: "row", gap: 8, marginTop: spacing.sm },
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -788,20 +967,13 @@ const styles = StyleSheet.create({
     color: colors.outline,
     fontWeight: "600",
   },
-  filterTextActive: {
-    color: colors.warmBrown,
-  },
-
+  filterTextActive: { color: colors.warmBrown },
   emptyCard: {
     alignItems: "center",
     gap: spacing.sm,
     paddingVertical: spacing.xl,
   },
-  emptyText: {
-    ...typography.bodySm,
-    color: colors.outline,
-  },
-
+  emptyText: { ...typography.bodySm, color: colors.outline },
   logHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -814,34 +986,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  warningIcon: {
-    backgroundColor: `${colors.error}15`,
-  },
-  successIcon: {
-    backgroundColor: "#D4F4DD",
-  },
-  logTitle: {
-    ...typography.h3,
-    fontSize: 15,
-    color: colors.warmBrown,
-  },
-  logStatus: {
-    ...typography.labelCaps,
-    fontSize: 10,
-    marginTop: 3,
-  },
-  warningText: {
-    color: colors.error,
-  },
-  successText: {
-    color: "#1F8A3F",
-  },
-  logTime: {
-    ...typography.labelCaps,
-    fontSize: 9,
-    color: colors.outline,
-  },
-
+  warningIcon: { backgroundColor: `${colors.error}15` },
+  successIcon: { backgroundColor: "#D4F4DD" },
+  logTitle: { ...typography.h3, fontSize: 15, color: colors.warmBrown },
+  logStatus: { ...typography.labelCaps, fontSize: 10, marginTop: 3 },
+  warningText: { color: colors.error },
+  successText: { color: "#1F8A3F" },
+  logTime: { ...typography.labelCaps, fontSize: 9, color: colors.outline },
   descriptionBox: {
     backgroundColor: colors.surfaceContainerLow,
     borderRadius: radii.lg,
@@ -855,7 +1006,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     lineHeight: 18,
   },
-
   logFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -873,7 +1023,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.onSurfaceVariant,
   },
-
   summaryCard: {
     flex: 1,
     backgroundColor: colors.surfaceContainerLowest,
@@ -883,11 +1032,7 @@ const styles = StyleSheet.create({
     borderColor: `${colors.orange}18`,
     gap: 6,
   },
-  summaryValue: {
-    ...typography.h2,
-    fontSize: 22,
-    color: colors.warmBrown,
-  },
+  summaryValue: { ...typography.h2, fontSize: 22, color: colors.warmBrown },
   summaryLabel: {
     ...typography.bodySm,
     fontSize: 11,

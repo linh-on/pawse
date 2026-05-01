@@ -2,11 +2,14 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  TextInput,
   Switch,
 } from "react-native";
+
 import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -179,23 +182,24 @@ const SettingsScreen = () => {
               <Text style={styles.cardTitle}>Grace Period</Text>
               <Text style={styles.cardSub}>Time to return before failing</Text>
             </View>
-            <Text style={styles.graceValue}>{grace}m</Text>
           </View>
-          <View style={styles.graceRow}>
-            {GRACE_OPTIONS.map((g) => (
-              <TouchableOpacity
-                key={g}
-                style={[styles.graceDot, grace === g && styles.graceDotActive]}
-                onPress={() => handleGraceChange(g)}
-              >
-                {grace === g && <View style={styles.graceDotInner} />}
-              </TouchableOpacity>
-            ))}
-            <View style={styles.graceTrack} />
-          </View>
-          <View style={patterns.rowBetween}>
-            <Text style={styles.graceLabel}>5 MIN</Text>
-            <Text style={styles.graceLabel}>15 MIN</Text>
+          <View style={styles.graceInputRow}>
+            <TextInput
+              style={styles.graceInput}
+              value={String(grace)}
+              onChangeText={(t) => {
+                const n = parseInt(t) || 0;
+                setGrace(n);
+              }}
+              onBlur={() => {
+                const clamped = Math.max(1, grace);
+                setGrace(clamped);
+                handleGraceChange(clamped);
+              }}
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+            <Text style={styles.graceUnit}>minutes</Text>
           </View>
         </View>
 
@@ -342,6 +346,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: radii["2xl"],
   },
+  graceInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  graceInput: {
+    ...typography.h2,
+    color: colors.primary,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary,
+    minWidth: 60,
+    textAlign: "center",
+    paddingVertical: 4,
+  },
+  graceUnit: { ...typography.bodyMd, color: colors.onSurfaceVariant },
   manageBtnText: {
     ...typography.bodyMd,
     color: colors.onPrimaryContainer,
