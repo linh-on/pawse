@@ -25,9 +25,6 @@ import {
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
-const MASCOT =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAFb7jjkY7NC_rkg3sSsGcNFn_sR9nbvDa0TNzK5TxPChSaCiPu-whKcwwYnarqWvGT2ugbEnmENbhqq7nC0PbNLUy7JnOBtcL8tgo4wH1AuTgI4C6Qtx280aMVHmlbwYDTCBJ7Z_OpC6kuI0fwt3Wm7tQMSdQckNWj9LkEoUBNMGoa-za19rKhTEwV-5A2gSPy1SuuHczBGQ-5uuSJImUrzvjDSm9wwCtb4UCC3dH9udT_9RJAH_pcH7CB3QmKWW3kArkr_DHxO3Ci";
-
 const SignInScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -36,7 +33,6 @@ const SignInScreen = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Demo sign-in: looks up the email in users table, signs in if found
   const handleSignIn = async () => {
     if (!email.trim()) {
       Alert.alert("Email required", "Enter an email to sign in.");
@@ -68,24 +64,20 @@ const SignInScreen = () => {
     navigation.reset({ index: 0, routes: [{ name: "Main" }] });
   };
 
-  // Quick-pick a seeded demo user
   const useDemoAccount = (demoEmail) => {
     setEmail(demoEmail);
   };
 
   return (
     <KeyboardAvoidingView
-      style={[styles.screen, { paddingTop: insets.top + spacing.lg }]}
+      style={[styles.screen, { paddingTop: insets.top + spacing.unit }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View
-        style={{
-          alignItems: "center",
-          gap: spacing.sm,
-          paddingTop: spacing.lg,
-        }}
-      >
-        <Image source={{ uri: MASCOT }} style={styles.mascot} />
+      <View style={{ alignItems: "center", gap: spacing.sm }}>
+        <Image
+          source={require("../../assets/pawse_logo.png")}
+          style={styles.logo}
+        />
         <Text style={styles.title}>Welcome to Pawse</Text>
         <Text style={styles.subtitle}>Your smart focus companion</Text>
       </View>
@@ -110,7 +102,11 @@ const SignInScreen = () => {
           style={[
             patterns.buttonPrimary,
             shadows.soft,
-            { borderRadius: radii["2xl"], marginTop: spacing.sm },
+            {
+              borderRadius: radii["2xl"],
+              marginTop: spacing.sm,
+              paddingVertical: 10,
+            },
             loading && { opacity: 0.6 },
           ]}
           onPress={handleSignIn}
@@ -129,7 +125,7 @@ const SignInScreen = () => {
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Quick-pick buttons for seeded accounts */}
+        {/* Role-based demo accounts */}
         <View style={{ gap: 8 }}>
           {[
             {
@@ -150,11 +146,11 @@ const SignInScreen = () => {
               icon: "family-restroom",
               color: colors.tertiary,
             },
-          ].map(({ email, label, icon, color }) => (
+          ].map(({ email: e, label, icon, color }) => (
             <TouchableOpacity
-              key={email}
+              key={e}
               style={styles.demoBtn}
-              onPress={() => useDemoAccount(email)}
+              onPress={() => useDemoAccount(e)}
             >
               <View
                 style={[
@@ -165,7 +161,7 @@ const SignInScreen = () => {
                 <MaterialIcons name={icon} size={15} color={color} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.demoBtnText}>{email}</Text>
+                <Text style={styles.demoBtnText}>{e}</Text>
                 <Text style={styles.demoRoleText}>{label}</Text>
               </View>
               <MaterialIcons
@@ -192,7 +188,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.containerPadding,
     justifyContent: "space-between",
   },
-  mascot: { width: 100, height: 100, borderRadius: radii["2xl"] },
+  logo: { width: 110, height: 110, resizeMode: "contain" },
   title: {
     ...typography.h1,
     fontSize: 28,

@@ -23,9 +23,6 @@ import {
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
-const PROFILE_AVATAR =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDFf66XVpfWKaaPQ5VXeJ9CnLYJOuG5pYlP69zwiD95-7ggVWwsKNVDVg0MRYXrOeSAOzEAUSNJsyS1TqOOCUqs-2gF695A5eOB_AW1wzuJnPNqrBHL5GuXVZKxnk3iVrX7vCtHPR6N0Qj076KqIKaztPlX2NfbZK1cx6OTlcaRXS-R2lj-4XWqFLs5rBtVGLumb88WfswLAuaCc3iOPSfdMFNWBq0ffzO4fo9M7FYPJ5YlN70TUJHUP4X9KPHGqoW1-guyMzrgyM9B";
-
 const XP_PER_MINUTE = 2;
 const XP_PER_LEVEL = 1000;
 
@@ -76,6 +73,7 @@ const ProfileScreen = () => {
 
   const [name, setName] = useState(user?.name || "");
   const [birthday, setBirthday] = useState(formatBirthday(user?.birthday));
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "");
   const email = user?.email || "";
 
   // Computed stats from sessions
@@ -87,6 +85,7 @@ const ProfileScreen = () => {
   useEffect(() => {
     setName(user?.name || "");
     setBirthday(formatBirthday(user?.birthday));
+    setAvatarUrl(user?.avatar_url || "");
   }, [user]);
 
   useEffect(() => {
@@ -128,6 +127,7 @@ const ProfileScreen = () => {
     const updates = {
       name: name.trim(),
       birthday: toDatabaseDate(birthday),
+      avatar_url: avatarUrl.trim() || null,
     };
 
     const { data, error } = await supabase
@@ -175,10 +175,17 @@ const ProfileScreen = () => {
           }}
         >
           <View style={[styles.avatarRing, shadows.card]}>
-            <Image source={{ uri: PROFILE_AVATAR }} style={styles.avatar} />
-            <TouchableOpacity style={styles.editAvatar}>
-              <MaterialIcons name="edit" size={14} color="#fff" />
-            </TouchableOpacity>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <MaterialIcons
+                  name="person"
+                  size={44}
+                  color={colors.outlineVariant}
+                />
+              </View>
+            )}
           </View>
           <Text style={styles.name}>{name}</Text>
           <Text style={styles.email}>{email}</Text>
@@ -251,6 +258,20 @@ const ProfileScreen = () => {
               {email}
             </Text>
           </View>
+          <View style={styles.fieldDivider} />
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Avatar URL</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={avatarUrl}
+              onChangeText={setAvatarUrl}
+              placeholder="https://..."
+              placeholderTextColor={colors.outlineVariant}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
         </View>
 
         <TouchableOpacity
@@ -258,6 +279,26 @@ const ProfileScreen = () => {
           onPress={handleSave}
         >
           <Text style={styles.saveBtnText}>Save Changes</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.signOutBtn}
+          onPress={() =>
+            Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Sign Out",
+                style: "destructive",
+                onPress: () => {
+                  setUser(null);
+                  navigation.reset({ index: 0, routes: [{ name: "SignIn" }] });
+                },
+              },
+            ])
+          }
+          activeOpacity={0.7}
+        >
+          <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -284,6 +325,14 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   avatar: { width: "100%", height: "100%", borderRadius: radii.full },
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   editAvatar: {
     position: "absolute",
     bottom: 4,
@@ -324,6 +373,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.onPrimaryContainer,
   },
+  signOutBtn: {
+    alignItems: "center",
+    paddingVertical: spacing.md,
+  },
+  signOutText: { ...typography.bodyMd, color: colors.error, fontWeight: "700" },
 });
 
 export default ProfileScreen;
