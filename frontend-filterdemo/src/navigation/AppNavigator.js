@@ -13,6 +13,7 @@ import CalendarScreen from "../screens/CalendarScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import SignInScreen from "../screens/SignInScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import SchoolScreen from "../screens/SchoolScreen";
 import {
   FilterSettingsScreen,
   CalendarSyncScreen,
@@ -24,6 +25,7 @@ const TAB_ITEMS = [
   { name: "Home", icon: "home", label: "Home" },
   { name: "Stats", icon: "leaderboard", label: "Stats" },
   { name: "Calendar", icon: "calendar-today", label: "Calendar" },
+  { name: "School", icon: "school", label: "School" },
   { name: "Settings", icon: "settings", label: "Settings" },
 ];
 
@@ -46,7 +48,7 @@ const CustomTabBar = ({ state, navigation }) => {
           >
             <MaterialIcons
               name={item.icon}
-              size={24}
+              size={22}
               color={isFocused ? colors.orange : colors.outline}
             />
             <Text style={[tabStyles.label, isFocused && tabStyles.labelActive]}>
@@ -76,14 +78,14 @@ const tabStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     gap: 4,
     borderRadius: radii.xl,
   },
   itemActive: { backgroundColor: `${colors.orange}18` },
   label: {
     ...typography.labelCaps,
-    fontSize: 10,
+    fontSize: 9,
     color: colors.outline,
     letterSpacing: 0.6,
   },
@@ -115,6 +117,12 @@ const CalendarStack = () => (
   </Stack.Navigator>
 );
 
+const SchoolStack = () => (
+  <Stack.Navigator screenOptions={NO_HEADER}>
+    <Stack.Screen name="School" component={SchoolScreen} />
+  </Stack.Navigator>
+);
+
 const SettingsStack = () => (
   <Stack.Navigator screenOptions={NO_HEADER}>
     <Stack.Screen name="Settings" component={SettingsScreen} />
@@ -131,6 +139,7 @@ const MainTabs = () => (
     <Tab.Screen name="Home" component={HomeStack} />
     <Tab.Screen name="Stats" component={StatsStack} />
     <Tab.Screen name="Calendar" component={CalendarStack} />
+    <Tab.Screen name="School" component={SchoolStack} />
     <Tab.Screen name="Settings" component={SettingsStack} />
   </Tab.Navigator>
 );

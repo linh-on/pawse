@@ -59,7 +59,7 @@ const SignInScreen = () => {
     if (!data) {
       Alert.alert(
         "User not found",
-        "No demo user exists for this email. Try one of the seeded accounts: buddy@pawse.app or bob@pawse.app.",
+        "No demo user exists for this email. Try one of the seeded accounts: buddy@pawse.app, teacher@pawse.app, or parent@pawse.app.",
       );
       return;
     }
@@ -131,18 +131,48 @@ const SignInScreen = () => {
 
         {/* Quick-pick buttons for seeded accounts */}
         <View style={{ gap: 8 }}>
-          {["buddy@pawse.app", "bob@pawse.app"].map((e) => (
+          {[
+            {
+              email: "buddy@pawse.app",
+              label: "Student",
+              icon: "school",
+              color: colors.primary,
+            },
+            {
+              email: "teacher@pawse.app",
+              label: "Teacher",
+              icon: "cast-for-education",
+              color: colors.secondary,
+            },
+            {
+              email: "parent@pawse.app",
+              label: "Parent",
+              icon: "family-restroom",
+              color: colors.tertiary,
+            },
+          ].map(({ email, label, icon, color }) => (
             <TouchableOpacity
-              key={e}
+              key={email}
               style={styles.demoBtn}
-              onPress={() => useDemoAccount(e)}
+              onPress={() => useDemoAccount(email)}
             >
+              <View
+                style={[
+                  styles.demoRoleBadge,
+                  { backgroundColor: `${color}18` },
+                ]}
+              >
+                <MaterialIcons name={icon} size={15} color={color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.demoBtnText}>{email}</Text>
+                <Text style={styles.demoRoleText}>{label}</Text>
+              </View>
               <MaterialIcons
-                name="account-circle"
-                size={18}
-                color={colors.warmBrown}
+                name="chevron-right"
+                size={16}
+                color={colors.outlineVariant}
               />
-              <Text style={styles.demoBtnText}>{e}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -210,18 +240,32 @@ const styles = StyleSheet.create({
   demoBtn: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: spacing.sm,
     paddingVertical: 10,
+    paddingHorizontal: spacing.sm,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.outlineVariant,
     backgroundColor: colors.surfaceContainerLowest,
   },
+  demoRoleBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   demoBtnText: {
     ...typography.bodySm,
     color: colors.warmBrown,
     fontWeight: "600",
+    fontSize: 13,
+  },
+  demoRoleText: {
+    ...typography.labelCaps,
+    fontSize: 9,
+    color: colors.outline,
+    marginTop: 1,
   },
 
   footer: {
