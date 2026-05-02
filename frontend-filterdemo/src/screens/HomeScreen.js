@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -16,9 +15,6 @@ import { colors, spacing, radii, shadows, typography } from "../theme";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 import { Picker } from "@react-native-picker/picker";
-
-const MASCOT_HOME =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAFb7jjkY7NC_rkg3sSsGcNFn_sR9nbvDa0TNzK5TxPChSaCiPu-whKcwwYnarqWvGT2ugbEnmENbhqq7nC0PbNLUy7JnOBtcL8tgo4wH1AuTgI4C6Qtx280aMVHmlbwYDTCBJ7Z_OpC6kuI0fwt3Wm7tQMSdQckNWj9LkEoUBNMGoa-za19rKhTEwV-5A2gSPy1SuuHczBGQ-5uuSJImUrzvjDSm9wwCtb4UCC3dH9udT_9RJAH_pcH7CB3QmKWW3kArkr_DHxO3Ci";
 
 const DEFAULT_PREP = [
   { label: "Silence phone notifications" },
@@ -227,7 +223,7 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.screen}>
-      <Header mascotSrc={MASCOT_HOME} />
+      <Header />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -236,11 +232,6 @@ const HomeScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <Image
-            source={{ uri: MASCOT_HOME }}
-            style={styles.mascot}
-            resizeMode="cover"
-          />
           <Text style={styles.greeting}>
             Hi, {user?.name?.split(" ")[0] || "there"}!
           </Text>
@@ -395,7 +386,6 @@ const styles = StyleSheet.create({
     gap: spacing.gutter,
   },
   hero: { alignItems: "center", gap: spacing.sm },
-  mascot: { width: 180, height: 180, borderRadius: radii["2xl"] },
   greeting: {
     ...typography.h1,
     color: colors.warmBrown,
