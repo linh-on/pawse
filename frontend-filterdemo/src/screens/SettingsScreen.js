@@ -2,12 +2,10 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
   TextInput,
-  Switch,
 } from "react-native";
 
 import { useNavigation } from "@react-navigation/native";
@@ -30,18 +28,20 @@ const THEMES = [
   { id: "dark", name: "Dark Fur", primary: "#5A5550", accent: "#2A2825" },
   { id: "sakura", name: "Sakura", primary: "#FEB2C2", accent: "#FFE8EE" },
 ];
-const GRACE_OPTIONS = [5, 10, 15];
-
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
-  const [theme, setTheme] = useState("classic");
+  const theme = "classic";
   const [grace, setGrace] = useState(10);
-  const [chime, setChime] = useState(true);
-  const [whiteNoise, setWhiteNoise] = useState(false);
-  const [parentalPin, setParentalPin] = useState(false);
+
+  const tier = user?.subscription_tier ?? "free";
+  const isFree = tier === "free";
+  const planName = isFree ? "Free Plan" : "Focus+ Member";
+  const planSub = isFree
+    ? "Up to 3 sessions per day."
+    : "Unlimited paws and premium features.";
 
   useEffect(() => {
     const fetchPreferences = async () => {
@@ -49,18 +49,12 @@ const SettingsScreen = () => {
 
       const { data, error } = await supabase
         .from("preferences")
-        .select(
-          "theme, grace_period_minutes, end_chime_enabled, white_noise_enabled, parental_pin_enabled",
-        )
+        .select("grace_period_minutes")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (!error && data) {
-        setTheme(data.theme || "classic");
         setGrace(data.grace_period_minutes || 10);
-        setChime(Boolean(data.end_chime_enabled));
-        setWhiteNoise(Boolean(data.white_noise_enabled));
-        setParentalPin(Boolean(data.parental_pin_enabled));
       }
     };
 
@@ -75,29 +69,9 @@ const SettingsScreen = () => {
       .upsert({ user_id: user.id, ...updates }, { onConflict: "user_id" });
   };
 
-  const handleThemeChange = (value) => {
-    setTheme(value);
-    updatePreference({ theme: value });
-  };
-
   const handleGraceChange = (value) => {
     setGrace(value);
     updatePreference({ grace_period_minutes: value });
-  };
-
-  const handleChimeChange = (value) => {
-    setChime(value);
-    updatePreference({ end_chime_enabled: value });
-  };
-
-  const handleWhiteNoiseChange = (value) => {
-    setWhiteNoise(value);
-    updatePreference({ white_noise_enabled: value });
-  };
-
-  const handleParentalPinChange = (value) => {
-    setParentalPin(value);
-    updatePreference({ parental_pin_enabled: value });
   };
 
   return (
@@ -112,7 +86,16 @@ const SettingsScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Active Plan */}
-        <View style={[styles.planCard, shadows.card]}>
+        <View
+          style={[
+            styles.planCard,
+            shadows.card,
+            isFree && {
+              backgroundColor: colors.surfaceContainerLow,
+              borderColor: `${colors.outline}22`,
+            },
+          ]}
+        >
           <View
             style={[
               patterns.rowBetween,
@@ -121,57 +104,99 @@ const SettingsScreen = () => {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.planLabel}>ACTIVE PLAN</Text>
-              <Text style={styles.planTitle}>Focus+ Member</Text>
-              <Text style={styles.planSub}>
-                Unlimited paws and premium sounds.
-              </Text>
+              <Text style={styles.planTitle}>{planName}</Text>
+              <Text style={styles.planSub}>{planSub}</Text>
             </View>
             <View style={styles.planStar}>
-              <MaterialIcons name="star" size={20} color={colors.primary} />
+              <MaterialIcons
+                name={isFree ? "lock-open" : "workspace-premium"}
+                size={20}
+                color={isFree ? colors.outline : colors.primary}
+              />
             </View>
           </View>
-          <TouchableOpacity style={styles.manageBtn} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={styles.manageBtn}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate("Subscription")}
+          >
             <Text style={styles.manageBtnText}>Manage Subscription</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Smart Filter link */}
+        <TouchableOpacity
+          style={[patterns.row, shadows.card]}
+          onPress={() => navigation.navigate("FilterSettings")}
+          activeOpacity={0.85}
+        >
+          <View
+            style={[
+              patterns.circleIcon,
+              { backgroundColor: `${colors.primary}15` },
+            ]}
+          >
+            <MaterialIcons name="psychology" size={18} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.audioName}>Smart Filter</Text>
+            <Text style={styles.audioSub}>Manage notification rules</Text>
+          </View>
+          <MaterialIcons
+            name="chevron-right"
+            size={22}
+            color={colors.outline}
+          />
+        </TouchableOpacity>
+
         {/* Display Theme */}
         <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
-          <Text style={styles.cardTitle}>Display Theme</Text>
+          <View style={patterns.rowBetween}>
+            <Text style={styles.cardTitle}>Display Theme</Text>
+            <View style={styles.comingSoonTag}>
+              <Text style={styles.comingSoonText}>Coming Soon</Text>
+            </View>
+          </View>
+
+          <Text style={styles.cardSub}>Classic mode is currently active.</Text>
+
           <View style={styles.themeRow}>
-            {THEMES.map((t) => (
-              <TouchableOpacity
-                key={t.id}
-                style={[
-                  styles.themeOption,
-                  theme === t.id && styles.themeOptionActive,
-                ]}
-                onPress={() => handleThemeChange(t.id)}
-                activeOpacity={0.85}
-              >
+            {THEMES.map((t) => {
+              const isClassic = t.id === theme;
+              return (
                 <View
-                  style={[styles.themeSwatch, { backgroundColor: t.accent }]}
-                >
-                  <View
-                    style={[
-                      styles.themeSwatchBar,
-                      { backgroundColor: t.primary },
-                    ]}
-                  />
-                </View>
-                <Text
+                  key={t.id}
                   style={[
-                    styles.themeName,
-                    theme === t.id && {
-                      color: colors.primary,
-                      fontWeight: "700",
-                    },
+                    styles.themeOption,
+                    isClassic && styles.themeOptionActive,
+                    !isClassic && styles.themeOptionDisabled,
                   ]}
                 >
-                  {t.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <View
+                    style={[styles.themeSwatch, { backgroundColor: t.accent }]}
+                  >
+                    <View
+                      style={[
+                        styles.themeSwatchBar,
+                        { backgroundColor: t.primary },
+                      ]}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.themeName,
+                      isClassic && {
+                        color: colors.primary,
+                        fontWeight: "700",
+                      },
+                      !isClassic && { color: colors.outlineVariant },
+                    ]}
+                  >
+                    {t.name}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -201,105 +226,6 @@ const SettingsScreen = () => {
             />
             <Text style={styles.graceUnit}>minutes</Text>
           </View>
-        </View>
-
-        {/* Session Audio */}
-        <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
-          <Text style={styles.cardTitle}>Session Audio</Text>
-
-          <View style={styles.audioRow}>
-            <View style={patterns.circleIcon}>
-              <MaterialIcons
-                name="notifications-active"
-                size={18}
-                color={colors.primary}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.audioName}>End Session Chime</Text>
-              <Text style={styles.audioSub}>Play sound when finished</Text>
-            </View>
-            <Switch
-              value={chime}
-              onValueChange={handleChimeChange}
-              trackColor={{
-                false: colors.surfaceContainerHigh,
-                true: colors.primary,
-              }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={styles.audioRow}>
-            <View style={patterns.circleIcon}>
-              <MaterialIcons name="forest" size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.audioName}>Ambient White Noise</Text>
-              <Text style={styles.audioSub}>Rainy forest background</Text>
-            </View>
-            <Switch
-              value={whiteNoise}
-              onValueChange={handleWhiteNoiseChange}
-              trackColor={{
-                false: colors.surfaceContainerHigh,
-                true: colors.primary,
-              }}
-              thumbColor="#fff"
-            />
-          </View>
-        </View>
-
-        {/* Smart Filter link */}
-        <TouchableOpacity
-          style={[patterns.row, shadows.card]}
-          onPress={() => navigation.navigate("FilterSettings")}
-          activeOpacity={0.85}
-        >
-          <View
-            style={[
-              patterns.circleIcon,
-              { backgroundColor: `${colors.primary}15` },
-            ]}
-          >
-            <MaterialIcons name="psychology" size={18} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.audioName}>Smart Filter</Text>
-            <Text style={styles.audioSub}>Manage notification rules</Text>
-          </View>
-          <MaterialIcons
-            name="chevron-right"
-            size={22}
-            color={colors.outline}
-          />
-        </TouchableOpacity>
-
-        {/* Parental Control PIN */}
-        <View style={[patterns.row, shadows.card]}>
-          <View
-            style={[
-              patterns.circleIcon,
-              { backgroundColor: `${colors.error}15` },
-            ]}
-          >
-            <MaterialIcons name="lock" size={18} color={colors.error} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.audioName}>Parental Control PIN</Text>
-            <Text style={styles.audioSub}>
-              Require PIN to change focus time
-            </Text>
-          </View>
-          <Switch
-            value={parentalPin}
-            onValueChange={handleParentalPinChange}
-            trackColor={{
-              false: colors.surfaceContainerHigh,
-              true: colors.primary,
-            }}
-            thumbColor="#fff"
-          />
         </View>
 
         {/* Sign Out */}
@@ -383,6 +309,19 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   themeOptionActive: { borderColor: colors.primary },
+  themeOptionDisabled: { opacity: 0.45 },
+  comingSoonTag: {
+    backgroundColor: `${colors.primary}15`,
+    borderRadius: radii.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  comingSoonText: {
+    ...typography.labelCaps,
+    fontSize: 9,
+    color: colors.primary,
+    fontWeight: "700",
+  },
   themeSwatch: {
     width: "100%",
     height: 50,

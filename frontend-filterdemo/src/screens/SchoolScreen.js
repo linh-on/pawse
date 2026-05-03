@@ -322,6 +322,7 @@ const StudentView = () => {
           .eq("id", sm.session_id)
           .maybeSingle();
         if (sess?.active) {
+          activeSessionRef.current = sess;
           setActiveSession(sess);
         } else {
           // Session ended — release
@@ -440,6 +441,7 @@ const StudentView = () => {
       { onConflict: "student_id" },
     );
 
+    activeSessionRef.current = sess;
     setActiveSession(sess);
     setSchoolModeOn(true);
     setSessionModal(false);
@@ -720,6 +722,7 @@ const TeacherView = () => {
   const [startingSession, setStartingSession] = useState(false);
 
   const pollRef = useRef(null);
+  const activeSessionRef = useRef(null); // always current session for poll closure
 
   const loadClasses = useCallback(() => {
     async function run() {
@@ -743,8 +746,9 @@ const TeacherView = () => {
     }, [loadClasses]),
   );
 
-  const loadRoster = useCallback(async (cls, sess) => {
-    if (!cls) return;
+  // Takes IDs (not objects) so it never closes over stale references
+  const loadRoster = useCallback(async (classId, sessionId) => {
+    if (!classId) return;
 
     // Everyone enrolled in the class
     const { data: members } = await supabase
@@ -752,26 +756,26 @@ const TeacherView = () => {
       .select(
         "student_id, users!class_members_student_id_fkey(id, name, email)",
       )
-      .eq("class_id", cls.id);
+      .eq("class_id", classId);
     if (members) setEnrolled(members);
 
     // Who has joined the active session
-    if (sess?.id) {
+    if (sessionId) {
       const { data: sm } = await supabase
         .from("class_session_members")
         .select(
           "student_id, joined_at, override_at, left_at, users!class_session_members_student_id_fkey(id, name)",
         )
-        .eq("session_id", sess.id);
+        .eq("session_id", sessionId);
       if (sm) setSessionMembers(sm);
 
-      // Override log
+      // Override log — real data from DB
       const { data: logs } = await supabase
         .from("override_log")
         .select(
           "id, student_id, overrode_at, rejoined_at, users!override_log_student_id_fkey(name)",
         )
-        .eq("session_id", sess.id)
+        .eq("session_id", sessionId)
         .order("overrode_at", { ascending: false });
       if (logs) setOverrides(logs);
     } else {
@@ -793,11 +797,16 @@ const TeacherView = () => {
       .maybeSingle();
 
     setActiveSession(sess ?? null);
-    await loadRoster(cls, sess ?? null);
+    await loadRoster(cls.id, sess?.id ?? null);
 
     // Poll roster every 5s for real-time feel
+    activeSessionRef.current = sess ?? null;
     if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => loadRoster(cls, sess ?? null), 5000);
+    const clsId = cls.id;
+    pollRef.current = setInterval(
+      () => loadRoster(clsId, activeSessionRef.current?.id ?? null),
+      5000,
+    );
   };
 
   const createClass = async () => {
@@ -871,6 +880,7 @@ const TeacherView = () => {
       })
       .eq("id", selected.id);
 
+    activeSessionRef.current = sess;
     setActiveSession(sess);
     setSelected((s) => ({ ...s, session_active: true }));
     setStartingSession(false);
@@ -878,10 +888,17 @@ const TeacherView = () => {
     setSessionCodeInput("");
     setDurationInput("45");
 
-    // Start polling roster
+    // Store session in ref so the poll closure always reads the latest
+    activeSessionRef.current = sess;
+
+    // Start polling roster with IDs — no stale closure risk
     if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => loadRoster(selected, sess), 5000);
-    loadRoster(selected, sess);
+    const classId = selected.id;
+    pollRef.current = setInterval(
+      () => loadRoster(classId, activeSessionRef.current?.id ?? null),
+      5000,
+    );
+    loadRoster(classId, sess.id);
   };
 
   const endSession = async () => {
@@ -907,9 +924,11 @@ const TeacherView = () => {
       .update({ is_on: false, locked: false, session_id: null })
       .eq("class_id", selected.id);
 
+    activeSessionRef.current = null;
     setActiveSession(null);
     setSelected((s) => ({ ...s, session_active: false }));
     setSessionMembers([]);
+    setOverrides([]);
     if (pollRef.current) clearInterval(pollRef.current);
   };
 
@@ -1851,6 +1870,7 @@ const StudentViewInner = ({ insets, meta }) => {
           .maybeSingle();
         if (sess?.active) {
           setSchoolModeOn(true);
+          activeSessionRef.current = sess;
           setActiveSession(sess);
         } else {
           await supabase
@@ -1961,6 +1981,7 @@ const StudentViewInner = ({ insets, meta }) => {
       { onConflict: "student_id" },
     );
 
+    activeSessionRef.current = sess;
     setActiveSession(sess);
     setSchoolModeOn(true);
     setSessionModal(false);

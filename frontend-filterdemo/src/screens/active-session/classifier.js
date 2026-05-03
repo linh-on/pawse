@@ -30,3 +30,41 @@ export function tfidfClassify(text) {
 
   return score > 0 ? "urgent" : "non_urgent";
 }
+
+/**
+ * Builds a flat lowercase keyword list from trusted_contacts rows.
+ * Each contact has a name + optional comma-separated note.
+ *
+ * e.g. [{ name: "Mom", note: "mama, home" }]
+ *   → ["mom", "mama", "home"]
+ */
+export function buildTrustedKeywords(contacts = []) {
+  return contacts.flatMap((c) => {
+    const base = [c.name.trim().toLowerCase()];
+    const extras = c.note
+      ? c.note
+          .split(",")
+          .map((k) => k.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
+    return [...base, ...extras];
+  });
+}
+
+/**
+ * Main classify function — checks trusted contacts FIRST, then falls back to ML.
+ *
+ * @param {string}   text            — notification text
+ * @param {string[]} trustedKeywords — from buildTrustedKeywords()
+ * @returns {"urgent" | "non_urgent"}
+ */
+export function classifyWithContacts(text, trustedKeywords = []) {
+  const lower = text.toLowerCase();
+
+  // Trusted contact match → always urgent, bypass ML entirely
+  const isTrusted = trustedKeywords.some((kw) => lower.includes(kw));
+  if (isTrusted) return "urgent";
+
+  // Fall back to TF-IDF model
+  return tfidfClassify(text);
+}

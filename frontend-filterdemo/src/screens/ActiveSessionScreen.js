@@ -23,64 +23,43 @@ import { useNotifSimulator } from "./active-session/useNotifSimulator";
 import NotifPanel from "./active-session/NotifPanel";
 import UrgentModal from "./active-session/UrgentModal";
 
-// ─── Modes ────────────────────────────────────────────────────────────────────
-// "focus"  — normal countdown, phone in box
-// "grace"  — override pressed, grace period counting down
-//            user can Continue (resume focus) or let it expire (restart focus)
-
 const ActiveSessionScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
 
-  const { durationMinutes = 45 } = route.params ?? {};
+  const { user } = useAuth();
+  const {
+    durationMinutes = 45,
+    initialRemainingSeconds,
+    existingSessionId,
+  } = route.params ?? {};
+
   const TOTAL_SECONDS = durationMinutes * 60;
 
   const { connected, remaining: boxRemaining, actions } = usePawseBox();
 
-  // ── Core timer state ──
-  const [mode, setMode] = useState("focus"); // "focus" | "grace"
-  const [localRemaining, setLocalRemaining] = useState(TOTAL_SECONDS);
-  const [gracePeriodSecs, setGracePeriodSecs] = useState(10 * 60); // default 10 min
-  const [graceRemaining, setGraceRemaining] = useState(10 * 60);
-
-  // Snapshot of focus time when override was pressed — used to resume
-  const pausedFocusRef = useRef(null);
+  const [localRemaining, setLocalRemaining] = useState(
+    typeof initialRemainingSeconds === "number"
+      ? initialRemainingSeconds
+      : TOTAL_SECONDS,
+  );
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const sessionStartedRef = useRef(false);
-  const dbSessionIdRef = useRef(null);
+  const dbSessionIdRef = useRef(existingSessionId ?? null);
   const sessionFinishedRef = useRef(false);
   const hasNavigatedRef = useRef(false);
 
-  // ── Fetch grace period from user preferences ──
-  useEffect(() => {
-    async function fetchGrace() {
-      if (!user?.id) return;
-      const { data } = await supabase
-        .from("preferences")
-        .select("grace_period_minutes")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data?.grace_period_minutes) {
-        const secs = data.grace_period_minutes * 60;
-        setGracePeriodSecs(secs);
-        setGraceRemaining(secs);
-      }
-    }
-    fetchGrace();
-  }, [user?.id]);
-
-  // ── Notification simulator ──
   const saveNotificationLog = async (entry) => {
     if (!dbSessionIdRef.current) return;
-    await supabase.from("notification_logs").insert({
+    const { error } = await supabase.from("notification_logs").insert({
       session_id: dbSessionIdRef.current,
       text: entry.text,
       predicted_label: entry.predicted,
       was_allowed: entry.predicted === "urgent",
     });
+    if (error) console.warn("Could not save notification log:", error.message);
   };
 
   const sim = useNotifSimulator({
@@ -91,13 +70,21 @@ const ActiveSessionScreen = () => {
     onUrgentDismiss: () => {
       if (connected) actions.respondUrgent(false);
     },
+    userId: user?.id,
   });
 
-  // ── Create DB session row on mount ──
+  // Create a DB session only for a brand-new focus session.
+  // When returning from GracePeriod, reuse the existing session id.
   useEffect(() => {
     let mounted = true;
-    async function createSession() {
+
+    const createSession = async () => {
       if (!user?.id) return;
+      if (existingSessionId) {
+        dbSessionIdRef.current = existingSessionId;
+        return;
+      }
+
       const { data, error } = await supabase
         .from("sessions")
         .insert({
@@ -108,83 +95,55 @@ const ActiveSessionScreen = () => {
         })
         .select("id")
         .single();
+
       if (error) {
-        console.warn("Could not create session:", error.message);
+        console.warn("Could not create focus session:", error.message);
         return;
       }
+
       if (mounted) dbSessionIdRef.current = data.id;
-    }
+    };
+
     createSession();
+
     return () => {
       mounted = false;
     };
-  }, [user?.id, durationMinutes]);
+  }, [user?.id, durationMinutes, existingSessionId]);
 
   const finishDbSession = async (completed) => {
     if (!dbSessionIdRef.current || sessionFinishedRef.current) return;
     sessionFinishedRef.current = true;
-    await supabase
+
+    const { error } = await supabase
       .from("sessions")
       .update({ ended_at: new Date().toISOString(), completed })
       .eq("id", dbSessionIdRef.current);
+
+    if (error) console.warn("Could not update focus session:", error.message);
   };
 
-  // ── Tell box to start when first connected ──
+  // Tell box to start when first connected.
   useEffect(() => {
     if (connected && !sessionStartedRef.current) {
-      actions.startSession(durationMinutes);
+      actions.startSession(Math.ceil(localRemaining / 60));
       sessionStartedRef.current = true;
     }
-  }, [connected, durationMinutes]);
+  }, [connected, localRemaining]);
 
-  // ── Focus countdown (local fallback when box not connected) ──
+  // Local fallback countdown.
   useEffect(() => {
-    if (connected) return; // box drives the timer
-    if (mode !== "focus") return; // paused during grace
+    if (connected) return;
+
     const id = setInterval(
       () => setLocalRemaining((r) => (r > 0 ? r - 1 : 0)),
       1000,
     );
+
     return () => clearInterval(id);
-  }, [connected, mode]);
+  }, [connected]);
 
-  // ── Grace countdown ──
-  useEffect(() => {
-    if (mode !== "grace") return;
-    const id = setInterval(
-      () => setGraceRemaining((r) => (r > 0 ? r - 1 : 0)),
-      1000,
-    );
-    return () => clearInterval(id);
-  }, [mode]);
-
-  // ── Grace expired → restart focus timer from full duration ──
-  useEffect(() => {
-    if (mode !== "grace") return;
-    if (graceRemaining <= 0) {
-      // Grace over — restart focus from full duration
-      setLocalRemaining(TOTAL_SECONDS);
-      setGraceRemaining(gracePeriodSecs); // reset grace for potential future use
-      pausedFocusRef.current = null;
-      setMode("focus");
-    }
-  }, [graceRemaining, mode]);
-
-  // ── Focus timer hit zero → session complete ──
-  const remainingSecs = connected ? parseTime(boxRemaining) : localRemaining;
-  const displayTime = connected ? boxRemaining : fmt(localRemaining);
-  const focusProgress = remainingSecs / TOTAL_SECONDS;
-
-  useEffect(() => {
-    if (mode !== "focus") return;
-    if (remainingSecs <= 0 && !hasNavigatedRef.current) {
-      hasNavigatedRef.current = true;
-      sim.clearModal();
-      finishDbSession(true).then(() => navigation.navigate("Home"));
-    }
-  }, [remainingSecs, mode]);
-
-  // ── Glow pulse ──
+  // Glow pulse.
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -200,137 +159,34 @@ const ActiveSessionScreen = () => {
         }),
       ]),
     ).start();
-  }, []);
+  }, [pulseAnim]);
 
-  // ── Override: enter grace mode ──
-  function handleOverride() {
-    sim.clearModal();
-    // Snapshot remaining focus time so we can resume it
-    pausedFocusRef.current = connected
-      ? parseTime(boxRemaining)
-      : localRemaining;
-    setGraceRemaining(gracePeriodSecs); // fresh grace countdown
-    setMode("grace");
-  }
+  const remainingSecs = connected ? parseTime(boxRemaining) : localRemaining;
+  const displayTime = connected ? boxRemaining : fmt(localRemaining);
+  const progress = TOTAL_SECONDS > 0 ? remainingSecs / TOTAL_SECONDS : 0;
 
-  // ── Continue: exit grace, resume focus from snapshot ──
-  function handleContinue() {
-    if (pausedFocusRef.current !== null) {
-      setLocalRemaining(pausedFocusRef.current);
-      pausedFocusRef.current = null;
+  // Timer finished.
+  useEffect(() => {
+    if (remainingSecs <= 0 && !hasNavigatedRef.current) {
+      hasNavigatedRef.current = true;
+      sim.clearModal();
+      finishDbSession(true).then(() => {
+        navigation.replace("HomeScreen");
+      });
     }
-    setMode("focus");
+  }, [remainingSecs, sim, navigation]);
+
+  function goToGracePeriod() {
+    if (connected) actions.respondUrgent(true);
+    sim.clearModal();
+
+    navigation.replace("GracePeriod", {
+      durationMinutes,
+      remainingSeconds: remainingSecs,
+      sessionId: dbSessionIdRef.current,
+    });
   }
 
-  // ── End session entirely (from grace screen) ──
-  async function handleEndSession() {
-    await finishDbSession(false);
-    navigation.navigate("Home");
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // GRACE MODE SCREEN
-  // ─────────────────────────────────────────────────────────────────────────────
-  if (mode === "grace") {
-    const graceProgress = graceRemaining / gracePeriodSecs;
-
-    return (
-      <View style={styles.screen}>
-        <Header badge="Grace Period" showProfile={false} />
-
-        <ScrollView
-          contentContainerStyle={[
-            styles.scroll,
-            { paddingBottom: insets.bottom + spacing.xl },
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Title */}
-          <View style={styles.titleBlock}>
-            <Text style={styles.title}>Taking a break?</Text>
-            <Text style={styles.subtitle}>
-              Your session is paused. Continue before the grace period ends.
-            </Text>
-          </View>
-
-          {/* Grace countdown ring — red tint */}
-          <Animated.View
-            style={[styles.ringWrap, { transform: [{ scale: pulseAnim }] }]}
-          >
-            <CircularProgress
-              size={288}
-              strokeWidth={10}
-              progress={graceProgress}
-              trackColor={colors.surfaceContainerHighest}
-              fillColor={colors.error}
-            >
-              <View
-                style={[
-                  styles.timerFace,
-                  { borderColor: `${colors.error}22` },
-                  shadows.timer,
-                ]}
-              >
-                <MaterialIcons
-                  name="timer-off"
-                  size={30}
-                  color={colors.error}
-                  style={{ marginBottom: 6 }}
-                />
-                <Text style={[styles.timerText, { color: colors.error }]}>
-                  {fmt(graceRemaining)}
-                </Text>
-                <Text style={styles.timerSub}>grace left</Text>
-              </View>
-            </CircularProgress>
-          </Animated.View>
-
-          {/* Paused focus time */}
-          <View style={styles.pausedBadge}>
-            <MaterialIcons
-              name="pause-circle"
-              size={16}
-              color={colors.outline}
-            />
-            <Text style={styles.pausedText}>
-              Focus paused at {fmt(pausedFocusRef.current ?? localRemaining)}
-            </Text>
-          </View>
-
-          {/* Continue button */}
-          <TouchableOpacity
-            style={styles.continueBtn}
-            onPress={handleContinue}
-            activeOpacity={0.85}
-          >
-            <MaterialIcons
-              name="play-arrow"
-              size={22}
-              color={colors.onPrimaryContainer}
-            />
-            <Text style={styles.continueBtnText}>Continue Session</Text>
-          </TouchableOpacity>
-
-          {/* End session — small, at the bottom */}
-          <TouchableOpacity
-            style={styles.overrideBtn}
-            onPress={handleEndSession}
-            activeOpacity={0.75}
-          >
-            <View style={styles.overrideCircle}>
-              <MaterialIcons name="stop" size={24} color={colors.outline} />
-            </View>
-            <Text style={styles.overrideCaption}>Give up for today</Text>
-            <Text style={styles.overrideLink}>End Session</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // FOCUS MODE SCREEN (unchanged layout)
-  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <View style={styles.screen}>
       <Header badge="Focus Active" showProfile={false} />
@@ -344,9 +200,7 @@ const ActiveSessionScreen = () => {
       >
         <View style={styles.titleBlock}>
           <Text style={styles.title}>Deep Focus Session</Text>
-          <Text style={styles.subtitle}>
-            Your phone is tucked away for a while.
-          </Text>
+          <Text style={styles.subtitle}>Your phone is tucked away for a while.</Text>
           <View style={styles.boxIndicator}>
             <View
               style={[
@@ -375,7 +229,7 @@ const ActiveSessionScreen = () => {
           <CircularProgress
             size={288}
             strokeWidth={10}
-            progress={focusProgress}
+            progress={progress}
             trackColor={colors.surfaceContainerHighest}
             fillColor={colors.primaryContainer}
           >
@@ -401,7 +255,7 @@ const ActiveSessionScreen = () => {
 
         <TouchableOpacity
           style={styles.overrideBtn}
-          onPress={handleOverride}
+          onPress={goToGracePeriod}
           activeOpacity={0.75}
         >
           <View style={styles.overrideCircle}>
@@ -418,13 +272,11 @@ const ActiveSessionScreen = () => {
         opacity={sim.modalOpacity}
         connected={connected}
         onDismiss={sim.dismissModal}
-        onOverride={handleOverride}
+        onOverride={goToGracePeriod}
       />
     </View>
   );
 };
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
@@ -458,35 +310,6 @@ const styles = StyleSheet.create({
   },
   timerText: { ...typography.timerDisplay, color: colors.onPrimaryFixed },
   timerSub: { ...typography.labelCaps, color: colors.outline, marginTop: 6 },
-
-  // Grace-specific
-  pausedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: radii.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-  },
-  pausedText: { ...typography.bodySm, color: colors.outline },
-  continueBtn: {
-    backgroundColor: colors.primaryContainer,
-    borderRadius: radii["3xl"],
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    ...shadows.soft,
-  },
-  continueBtnText: {
-    ...typography.h3,
-    fontSize: 16,
-    color: colors.onPrimaryContainer,
-  },
-
-  // Override / End button (same pattern, used in both modes)
   overrideBtn: { alignItems: "center", gap: 6 },
   overrideCircle: {
     width: 56,

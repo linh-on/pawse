@@ -2,12 +2,12 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Header from "../components/Header";
 import {
@@ -17,9 +17,12 @@ import {
   shadows,
   typography,
   patterns,
+  tint,
 } from "../theme";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const MONTH_NAMES = [
@@ -39,31 +42,156 @@ const MONTH_NAMES = [
 
 const XP_PER_MINUTE = 2;
 const XP_PER_LEVEL = 1000;
-
-// Earliest week allowed (Jan 1 2026)
 const MIN_DATE = new Date("2026-01-01T00:00:00");
 
-const REWARD_DEFS = [
-  { name: "Tiny Sprout", icon: "local-florist", minLevel: 1 },
-  { name: "Lo-Fi Beanie", icon: "headset", minLevel: 2 },
-  { name: "Warm Cocoa", icon: "local-cafe", minLevel: 5 },
-  { name: "Comfy Scarf", icon: "favorite", minLevel: 10 },
-  { name: "Sleepy Bug", icon: "nightlight", minLevel: 15 },
-  { name: "Level 19", icon: "lock", minLevel: 19 },
-  { name: "Level 24", icon: "lock", minLevel: 24 },
-  { name: "Level 28", icon: "lock", minLevel: 28 },
-  { name: "Level 30", icon: "lock", minLevel: 30 },
+// ─── Titles — earned by level ─────────────────────────────────────────────────
+const TITLES = [
+  { minLevel: 1, title: "Restless Paw", icon: "pets", color: colors.outline },
+  {
+    minLevel: 3,
+    title: "Curious Cat",
+    icon: "visibility",
+    color: colors.tertiary,
+  },
+  {
+    minLevel: 5,
+    title: "Focused Feline",
+    icon: "center-focus-strong",
+    color: colors.primary,
+  },
+  {
+    minLevel: 8,
+    title: "Deep Diver",
+    icon: "self-improvement",
+    color: colors.secondary,
+  },
+  { minLevel: 12, title: "Zen Paws", icon: "spa", color: colors.success },
+  { minLevel: 18, title: "Laser Beam", icon: "bolt", color: colors.orange },
+  {
+    minLevel: 25,
+    title: "Paw Master",
+    icon: "military-tech",
+    color: colors.primary,
+  },
 ];
 
-const MASCOT =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAFb7jjkY7NC_rkg3sSsGcNFn_sR9nbvDa0TNzK5TxPChSaCiPu-whKcwwYnarqWvGT2ugbEnmENbhqq7nC0PbNLUy7JnOBtcL8tgo4wH1AuTgI4C6Qtx280aMVHmlbwYDTCBJ7Z_OpC6kuI0fwt3Wm7tQMSdQckNWj9LkEoUBNMGoa-za19rKhTEwV-5A2gSPy1SuuHczBGQ-5uuSJImUrzvjDSm9wwCtb4UCC3dH9udT_9RJAH_pcH7CB3QmKWW3kArkr_DHxO3Ci";
+const getTitle = (level) => {
+  let current = TITLES[0];
+  for (const t of TITLES) {
+    if (level >= t.minLevel) current = t;
+  }
+  return current;
+};
+
+const getNextTitle = (level) => TITLES.find((t) => t.minLevel > level) ?? null;
+
+// ─── Badges — earned from real behavior ──────────────────────────────────────
+// Each badge has: id, name, desc, icon, color, check(stats) → bool
+
+const BADGE_DEFS = [
+  {
+    id: "first_session",
+    name: "First Paw",
+    desc: "Complete your first session",
+    icon: "flag",
+    color: colors.primary,
+    check: (s) => s.completedSessions >= 1,
+  },
+  {
+    id: "streak_3",
+    name: "Hat Trick",
+    desc: "3-day focus streak",
+    icon: "local-fire-department",
+    color: colors.orange,
+    check: (s) => s.streak >= 3,
+  },
+  {
+    id: "streak_7",
+    name: "Week Warrior",
+    desc: "7-day focus streak",
+    icon: "whatshot",
+    color: colors.error,
+    check: (s) => s.streak >= 7,
+  },
+  {
+    id: "streak_30",
+    name: "Iron Paw",
+    desc: "30-day focus streak",
+    icon: "workspace-premium",
+    color: colors.secondary,
+    check: (s) => s.streak >= 30,
+  },
+  {
+    id: "hours_5",
+    name: "5h Club",
+    desc: "5 total hours of focus",
+    icon: "schedule",
+    color: colors.primary,
+    check: (s) => s.totalMinutes >= 300,
+  },
+  {
+    id: "hours_24",
+    name: "Day Spent",
+    desc: "24 total hours of focus",
+    icon: "timelapse",
+    color: colors.secondary,
+    check: (s) => s.totalMinutes >= 1440,
+  },
+  {
+    id: "hours_100",
+    name: "Century",
+    desc: "100 total hours of focus",
+    icon: "emoji-events",
+    color: colors.orange,
+    check: (s) => s.totalMinutes >= 6000,
+  },
+  {
+    id: "sessions_10",
+    name: "Habit Forming",
+    desc: "10 completed sessions",
+    icon: "repeat",
+    color: colors.tertiary,
+    check: (s) => s.completedSessions >= 10,
+  },
+  {
+    id: "sessions_50",
+    name: "Dedicated",
+    desc: "50 completed sessions",
+    icon: "star",
+    color: colors.orange,
+    check: (s) => s.completedSessions >= 50,
+  },
+  {
+    id: "no_override",
+    name: "Pure Focus",
+    desc: "Complete 5 sessions with no overrides",
+    icon: "shield",
+    color: colors.success,
+    check: (s) => s.cleanSessions >= 5,
+  },
+  {
+    id: "shield_80",
+    name: "Disciplined",
+    desc: "80%+ focus shield rate (min 10 sessions)",
+    icon: "security",
+    color: colors.success,
+    check: (s) => s.completedSessions >= 10 && s.shieldRate >= 80,
+  },
+  {
+    id: "long_session",
+    name: "Marathon",
+    desc: "Complete a 90+ minute session",
+    icon: "hourglass-full",
+    color: colors.secondary,
+    check: (s) => s.longestSession >= 90,
+  },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Monday of the week that is `offset` weeks from the current week. */
 const getWeekStart = (offset) => {
   const today = new Date();
-  const daysFromMonday = (today.getDay() + 6) % 7; // Mon=0 … Sun=6
+  const daysFromMonday = (today.getDay() + 6) % 7;
   const d = new Date(today);
   d.setDate(today.getDate() - daysFromMonday + offset * 7);
   d.setHours(0, 0, 0, 0);
@@ -88,25 +216,19 @@ const getWeekLabel = (offset) => {
   return `${fmtDate(ws)} – ${fmtDate(we)}`;
 };
 
-/**
- * Returns [0..1] bar heights for each of the 7 days in the given week,
- * plus the total focused minutes for that week.
- */
 const buildWeekData = (sessions, weekOffset) => {
   const weekStart = getWeekStart(weekOffset);
   const weekEnd = getWeekEnd(weekStart);
   const totals = Array(7).fill(0);
-
   sessions
     .filter((s) => s.completed)
     .forEach((s) => {
       const date = new Date(s.started_at);
       if (date >= weekStart && date < weekEnd) {
-        const index = Math.floor((date - weekStart) / (1000 * 60 * 60 * 24));
-        if (index >= 0 && index < 7) totals[index] += s.duration_minutes || 0;
+        const idx = Math.floor((date - weekStart) / (1000 * 60 * 60 * 24));
+        if (idx >= 0 && idx < 7) totals[idx] += s.duration_minutes || 0;
       }
     });
-
   const weekMinutes = totals.reduce((a, b) => a + b, 0);
   const max = Math.max(...totals, 1);
   const bars = totals.map((v) => Math.max(v / max, v > 0 ? 0.12 : 0));
@@ -140,15 +262,14 @@ const getCurrentStreak = (sessions) => {
 };
 
 const getPeakFocusHour = (sessions) => {
-  const totalsByHour = {};
+  const byHour = {};
   sessions
     .filter((s) => s.completed)
     .forEach((s) => {
-      const hour = new Date(s.started_at).getHours();
-      totalsByHour[hour] =
-        (totalsByHour[hour] || 0) + (s.duration_minutes || 0);
+      const h = new Date(s.started_at).getHours();
+      byHour[h] = (byHour[h] || 0) + (s.duration_minutes || 0);
     });
-  const peak = Object.entries(totalsByHour).sort((a, b) => b[1] - a[1])[0];
+  const peak = Object.entries(byHour).sort((a, b) => b[1] - a[1])[0];
   if (!peak) return "--";
   const d = new Date();
   d.setHours(Number(peak[0]), 0, 0, 0);
@@ -156,32 +277,28 @@ const getPeakFocusHour = (sessions) => {
 };
 
 const buildMonthGrid = (sessions, year, month) => {
-  const minutesByDay = {};
+  const byDay = {};
   sessions
     .filter((s) => s.completed)
     .forEach((s) => {
-      // Use local date, not UTC (toISOString gives UTC which can be off by 1 day)
-      const d2 = new Date(s.started_at);
-      const key = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
-      minutesByDay[key] = (minutesByDay[key] || 0) + (s.duration_minutes || 0);
+      const d = new Date(s.started_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      byDay[key] = (byDay[key] || 0) + (s.duration_minutes || 0);
     });
-
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDow = new Date(year, month, 1).getDay();
   const leadingEmpties = (firstDow + 6) % 7;
-
   const cells = [];
   for (let i = 0; i < leadingEmpties; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const mins = minutesByDay[key] || 0;
+    const mins = byDay[key] || 0;
     let intensity = 0;
     if (mins >= 60) intensity = 3;
     else if (mins >= 30) intensity = 2;
     else if (mins > 0) intensity = 1;
     cells.push({ day: d, intensity });
   }
-
   const rows = [];
   for (let i = 0; i < cells.length; i += 7) {
     const row = cells.slice(i, i + 7);
@@ -191,14 +308,13 @@ const buildMonthGrid = (sessions, year, month) => {
   return rows;
 };
 
-function cellColor(intensity) {
-  return [
+const cellColor = (intensity) =>
+  [
     `${colors.primary}10`,
     `${colors.primaryContainer}80`,
     colors.primaryContainer,
     colors.primary,
   ][intensity];
-}
 
 const formatTime = (dateString) => {
   if (!dateString) return "";
@@ -248,7 +364,7 @@ const buildLogItems = (sessions) => {
         time: formatTime(session.ended_at || session.started_at),
         icon: "check-circle-outline",
         duration: `Duration: ${session.duration_minutes || 0} mins`,
-        source: "Earned: +25 Paws",
+        source: `Earned: +${(session.duration_minutes || 0) * XP_PER_MINUTE} XP`,
         sortTime: new Date(session.ended_at || session.started_at).getTime(),
       });
     } else {
@@ -272,17 +388,15 @@ const buildLogItems = (sessions) => {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const StatsScreen = () => {
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
   const [tab, setTab] = useState("stats");
   const [sessions, setSessions] = useState([]);
   const [logFilter, setLogFilter] = useState("all");
-
-  // Week navigation (0 = current week, negative = past)
   const [weekOffset, setWeekOffset] = useState(0);
 
-  // Month grid navigation
   const now = new Date();
   const [gridYear, setGridYear] = useState(now.getFullYear());
   const [gridMonth, setGridMonth] = useState(now.getMonth());
@@ -293,10 +407,8 @@ const StatsScreen = () => {
       const { data, error } = await supabase
         .from("sessions")
         .select(
-          `
-          id, duration_minutes, started_at, ended_at, completed,
-          notification_logs (id, text, predicted_label, was_allowed, fired_at)
-        `,
+          `id, duration_minutes, started_at, ended_at, completed,
+                 notification_logs (id, text, predicted_label, was_allowed, fired_at)`,
         )
         .eq("user_id", user.id)
         .order("started_at", { ascending: false });
@@ -305,11 +417,11 @@ const StatsScreen = () => {
     fetchSessions();
   }, [user?.id]);
 
-  // ── Week navigation bounds ──
+  // ── Week nav ──
   const canGoBack = getWeekStart(weekOffset - 1) >= MIN_DATE;
   const canGoForward = weekOffset < 0;
 
-  // ── Month navigation bounds ──
+  // ── Month nav ──
   const isCurrentMonth =
     gridYear === now.getFullYear() && gridMonth === now.getMonth();
   const goToPrevMonth = () => {
@@ -327,25 +439,60 @@ const StatsScreen = () => {
   };
 
   // ── Derived stats ──
-  const completedMinutes = sessions
-    .filter((s) => s.completed)
-    .reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-
-  const { bars: weekBars, weekMinutes } = buildWeekData(sessions, weekOffset);
+  const completedSessions = sessions.filter((s) => s.completed);
+  const totalMinutes = completedSessions.reduce(
+    (s, x) => s + (x.duration_minutes || 0),
+    0,
+  );
   const streak = getCurrentStreak(sessions);
   const peakFocus = getPeakFocusHour(sessions);
-  const grid = buildMonthGrid(sessions, gridYear, gridMonth);
+  const longestSession = completedSessions.reduce(
+    (max, s) => Math.max(max, s.duration_minutes || 0),
+    0,
+  );
+  const cleanSessions = completedSessions.filter((s) => {
+    const hasUrgent = s.notification_logs?.some(
+      (l) => l.predicted_label === "urgent" && l.was_allowed,
+    );
+    return !hasUrgent;
+  }).length;
+  const allLogItems = buildLogItems(sessions);
+  const overrideCount = allLogItems.filter(
+    (i) => i.type === "override" || i.type === "unlock",
+  ).length;
+  const completedCount = allLogItems.filter(
+    (i) => i.type === "completed",
+  ).length;
+  const shieldRate =
+    allLogItems.length === 0
+      ? 0
+      : Math.round((completedCount / allLogItems.length) * 100);
 
-  const totalXP = completedMinutes * XP_PER_MINUTE;
+  // ── XP / Level ──
+  const totalXP = totalMinutes * XP_PER_MINUTE;
   const level = Math.floor(totalXP / XP_PER_LEVEL) + 1;
   const xpInLevel = totalXP % XP_PER_LEVEL;
   const xpProgress = xpInLevel / XP_PER_LEVEL;
-  const rewards = REWARD_DEFS.map((r) => ({
-    ...r,
-    unlocked: level >= r.minLevel,
-  }));
 
-  const allLogItems = buildLogItems(sessions);
+  const currentTitle = getTitle(level);
+  const nextTitle = getNextTitle(level);
+
+  // ── Badges ──
+  const statsObj = {
+    totalMinutes,
+    streak,
+    completedSessions: completedSessions.length,
+    cleanSessions,
+    shieldRate,
+    longestSession,
+  };
+  const badges = BADGE_DEFS.map((b) => ({ ...b, earned: b.check(statsObj) }));
+  const earnedCount = badges.filter((b) => b.earned).length;
+
+  // ── Chart data ──
+  const { bars: weekBars, weekMinutes } = buildWeekData(sessions, weekOffset);
+  const grid = buildMonthGrid(sessions, gridYear, gridMonth);
+
   const visibleLogItems = allLogItems.filter((item) => {
     if (logFilter === "all") return true;
     if (logFilter === "overrides")
@@ -353,52 +500,41 @@ const StatsScreen = () => {
     if (logFilter === "completed") return item.type === "completed";
     return true;
   });
-  const overrideCount = allLogItems.filter(
-    (item) => item.type === "override" || item.type === "unlock",
-  ).length;
-  const completedCount = allLogItems.filter(
-    (item) => item.type === "completed",
-  ).length;
-  const focusShieldRate =
-    allLogItems.length === 0
-      ? 0
-      : Math.round((completedCount / allLogItems.length) * 100);
 
-  // ── Render ──
+  // ── Render: Stats tab ──
   const renderStats = () => (
     <>
-      <View style={{ flexDirection: "row", gap: spacing.sm }}>
-        <View style={[styles.peakCard, shadows.card]}>
-          <Text style={styles.peakLabel}>PEAK FOCUS</Text>
-          <Text style={styles.peakValue}>{peakFocus}</Text>
+      {/* Override Log shortcut */}
+      <TouchableOpacity
+        style={[patterns.row, shadows.card]}
+        onPress={() => navigation.navigate("OverrideLog")}
+        activeOpacity={0.85}
+      >
+        <View
+          style={[
+            patterns.circleIcon,
+            { backgroundColor: `${colors.error}15` },
+          ]}
+        >
+          <MaterialIcons name="history" size={18} color={colors.error} />
         </View>
-        <View style={[styles.streakCard, shadows.card]}>
-          <Text style={styles.streakLabel}>CURRENT STREAK</Text>
-          <View
-            style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}
-          >
-            <Text style={styles.streakNum}>{streak}</Text>
-            <Text style={styles.streakUnit}>days</Text>
-          </View>
-          <View style={styles.streakBar}>
-            <View
-              style={[
-                styles.streakBarFill,
-                { width: `${Math.min(streak / 30, 1) * 100}%` },
-              ]}
-            />
-          </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.audioName}>Override Log</Text>
+          <Text style={styles.audioSub}>
+            Review emergency unlocks and allowed urgent notifications
+          </Text>
         </View>
-      </View>
-
-      {/* Weekly Focus — navigable */}
+        <View style={styles.logCountPill}>
+          <Text style={styles.logCountText}>{overrideCount}</Text>
+        </View>
+        <MaterialIcons name="chevron-right" size={22} color={colors.outline} />
+      </TouchableOpacity>
+      {/* Weekly Focus */}
       <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
-        {/* Week header */}
         <View style={patterns.rowBetween}>
           <Text style={styles.cardTitle}>Weekly Focus</Text>
           <Text style={styles.cardMeta}>{formatHours(weekMinutes)}</Text>
         </View>
-
         <View style={styles.weekNav}>
           <TouchableOpacity
             style={[styles.weekArrow, !canGoBack && { opacity: 0.3 }]}
@@ -411,9 +547,7 @@ const StatsScreen = () => {
               color={colors.warmBrown}
             />
           </TouchableOpacity>
-
           <Text style={styles.weekLabel}>{getWeekLabel(weekOffset)}</Text>
-
           <TouchableOpacity
             style={[styles.weekArrow, !canGoForward && { opacity: 0.3 }]}
             onPress={() => canGoForward && setWeekOffset((o) => o + 1)}
@@ -426,7 +560,6 @@ const StatsScreen = () => {
             />
           </TouchableOpacity>
         </View>
-
         <View style={styles.chartArea}>
           {weekBars.map((v, i) => (
             <View key={i} style={styles.chartCol}>
@@ -434,7 +567,6 @@ const StatsScreen = () => {
             </View>
           ))}
         </View>
-
         <View style={{ flexDirection: "row", gap: 8, paddingTop: 4 }}>
           {DAYS.map((d, i) => (
             <Text key={i} style={styles.chartLabel}>
@@ -444,7 +576,7 @@ const StatsScreen = () => {
         </View>
       </View>
 
-      {/* Consistency Grid — month view */}
+      {/* Month grid */}
       <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
         <View style={patterns.rowBetween}>
           <TouchableOpacity onPress={goToPrevMonth} style={styles.monthArrow}>
@@ -469,7 +601,6 @@ const StatsScreen = () => {
             />
           </TouchableOpacity>
         </View>
-
         <View style={styles.legendRow}>
           <Text style={styles.legendLabel}>Less</Text>
           {[0, 1, 2, 3].map((i) => (
@@ -480,7 +611,6 @@ const StatsScreen = () => {
           ))}
           <Text style={styles.legendLabel}>More</Text>
         </View>
-
         <View style={styles.dowRow}>
           {DAYS.map((d, i) => (
             <Text key={i} style={styles.dowLabel}>
@@ -488,7 +618,6 @@ const StatsScreen = () => {
             </Text>
           ))}
         </View>
-
         <View style={{ gap: 4 }}>
           {grid.map((row, ri) => (
             <View key={ri} style={{ flexDirection: "row", gap: 4 }}>
@@ -509,73 +638,168 @@ const StatsScreen = () => {
           ))}
         </View>
       </View>
+    </>
+  );
 
-      {/* XP / Mascot */}
-      <View style={[patterns.card, shadows.card, { gap: spacing.gutter }]}>
-        <View
-          style={{
-            flexDirection: "row",
-            gap: spacing.sm,
-            alignItems: "center",
-          }}
-        >
-          <View style={styles.mascotAvatar}>
-            <Image source={{ uri: MASCOT }} style={styles.mascotImg} />
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelText}>{level}</Text>
-            </View>
+  // ── Render: Game tab ──
+  const renderGame = () => (
+    <>
+      {/* ── Level & Title card ── */}
+      <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
+        {/* Title row */}
+        <View style={styles.titleRow}>
+          <View
+            style={[
+              styles.titleIconWrap,
+              { backgroundColor: tint(currentTitle.color, 0.15) },
+            ]}
+          >
+            <MaterialIcons
+              name={currentTitle.icon}
+              size={28}
+              color={currentTitle.color}
+            />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.mascotName}>Mochi the{"\n"}Calico</Text>
-            <Text style={styles.xpLabel}>XP Progress</Text>
-            <View style={{ gap: 4, marginTop: 4 }}>
-              <View style={styles.xpBar}>
-                <View
-                  style={[
-                    styles.xpBarFill,
-                    { width: `${Math.round(xpProgress * 100)}%` },
-                  ]}
-                />
-              </View>
-              <Text style={styles.xpText}>
-                {xpInLevel} / {XP_PER_LEVEL}
-              </Text>
-            </View>
+            <Text style={styles.cardMeta}>CURRENT TITLE</Text>
+            <Text style={[styles.titleText, { color: currentTitle.color }]}>
+              {currentTitle.title}
+            </Text>
+          </View>
+          {/* Level badge */}
+          <View style={styles.levelBubble}>
+            <Text style={styles.levelBubbleLabel}>LVL</Text>
+            <Text style={styles.levelBubbleNum}>{level}</Text>
           </View>
         </View>
-        <View style={styles.rewardGrid}>
-          {rewards.map((r, i) => (
+
+        {/* XP bar */}
+        <View style={{ gap: 6 }}>
+          <View style={styles.xpBarTrack}>
             <View
-              key={i}
-              style={[styles.rewardCell, !r.unlocked && styles.rewardLocked]}
-            >
-              <MaterialIcons
-                name={r.unlocked ? r.icon : "lock"}
-                size={22}
-                color={r.unlocked ? colors.primary : colors.outlineVariant}
-              />
-              <Text
-                style={[
-                  styles.rewardName,
-                  !r.unlocked && { color: colors.outlineVariant },
-                ]}
-              >
-                {r.name}
+              style={[
+                styles.xpBarFill,
+                { width: `${Math.round(xpProgress * 100)}%` },
+              ]}
+            />
+          </View>
+          <View
+            style={{ flexDirection: "row", justifyContent: "space-between" }}
+          >
+            <Text style={styles.xpSubtext}>
+              {xpInLevel} / {XP_PER_LEVEL} XP
+            </Text>
+            {nextTitle && (
+              <Text style={styles.xpSubtext}>
+                Next:{" "}
+                <Text style={{ color: nextTitle.color, fontWeight: "700" }}>
+                  {nextTitle.title}
+                </Text>{" "}
+                @ Lvl {nextTitle.minLevel}
               </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Stats strip */}
+        <View style={styles.statsStrip}>
+          {[
+            {
+              label: "SESSIONS",
+              value: completedSessions.length,
+              icon: "check-circle-outline",
+            },
+            {
+              label: "TOTAL TIME",
+              value: formatHours(totalMinutes),
+              icon: "schedule",
+            },
+          ].map((s, i) => (
+            <View key={i} style={styles.statsStripItem}>
+              <MaterialIcons name={s.icon} size={14} color={colors.outline} />
+              <Text style={styles.statsStripValue}>{s.value}</Text>
+              <Text style={styles.statsStripLabel}>{s.label}</Text>
             </View>
           ))}
+        </View>
+      </View>
+
+      {/* ── Badges — Coming Soon ── */}
+      <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
+        <View style={patterns.rowBetween}>
+          <Text style={styles.cardTitle}>Badges</Text>
+          <View style={styles.comingSoonPill}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+        </View>
+        <View style={styles.comingSoonBlock}>
+          <MaterialIcons
+            name="military-tech"
+            size={36}
+            color={colors.outlineVariant}
+          />
+          <Text style={styles.comingSoonTitle}>Badges are on the way</Text>
+          <Text style={styles.comingSoonDesc}>
+            Earn badges for streaks, focus hours, and clean sessions. Keep
+            building your habit — they'll be ready soon.
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Leaderboard — Coming Soon ── */}
+      <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
+        <View style={patterns.rowBetween}>
+          <Text style={styles.cardTitle}>Leaderboard</Text>
+          <View style={styles.comingSoonPill}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+        </View>
+        <View style={styles.comingSoonBlock}>
+          <MaterialIcons
+            name="leaderboard"
+            size={36}
+            color={colors.outlineVariant}
+          />
+          <Text style={styles.comingSoonTitle}>Compete with friends</Text>
+          <Text style={styles.comingSoonDesc}>
+            See how your focus time stacks up against your class or friends.
+            Invite others to join Pawse.
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Challenges — Coming Soon ── */}
+      <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
+        <View style={patterns.rowBetween}>
+          <Text style={styles.cardTitle}>Weekly Challenges</Text>
+          <View style={styles.comingSoonPill}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+        </View>
+        <View style={styles.comingSoonBlock}>
+          <MaterialIcons
+            name="emoji-events"
+            size={36}
+            color={colors.outlineVariant}
+          />
+          <Text style={styles.comingSoonTitle}>Beat the week</Text>
+          <Text style={styles.comingSoonDesc}>
+            New challenges every Monday — focus for 5 hours, hit a 7-day streak,
+            or complete 10 sessions without overrides.
+          </Text>
         </View>
       </View>
     </>
   );
 
+  // ── Render: Log tab ──
   const renderLog = () => (
     <>
       <View style={{ gap: 4 }}>
         <Text style={styles.eyebrow}>ACTIVITY HISTORY</Text>
-        <Text style={styles.title}>Override Log</Text>
-        <Text style={styles.subtitle}>
-          A gentle look back at your session breaks and focus milestones.
+        <Text style={styles.logTitle}>Session Log</Text>
+        <Text style={styles.logSubtitle}>
+          A look back at your focus sessions and overrides.
         </Text>
       </View>
 
@@ -630,11 +854,13 @@ const StatsScreen = () => {
                   <MaterialIcons
                     name={item.icon}
                     size={18}
-                    color={item.type === "completed" ? "#1F8A3F" : colors.error}
+                    color={
+                      item.type === "completed" ? colors.success : colors.error
+                    }
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.logTitle}>{item.title}</Text>
+                  <Text style={styles.logItemTitle}>{item.title}</Text>
                   <Text
                     style={[
                       styles.logStatus,
@@ -683,7 +909,7 @@ const StatsScreen = () => {
             size={22}
             color={colors.primary}
           />
-          <Text style={styles.summaryValue}>{focusShieldRate}%</Text>
+          <Text style={styles.summaryValue}>{shieldRate}%</Text>
           <Text style={styles.summaryLabel}>Focus Shield Rate</Text>
         </View>
         <View style={[styles.summaryCard, shadows.card]}>
@@ -693,7 +919,7 @@ const StatsScreen = () => {
             color={colors.error}
           />
           <Text style={styles.summaryValue}>{overrideCount}</Text>
-          <Text style={styles.summaryLabel}>Overrides this week</Text>
+          <Text style={styles.summaryLabel}>Total Overrides</Text>
         </View>
       </View>
     </>
@@ -710,32 +936,30 @@ const StatsScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.tabs, shadows.card]}>
-          <TouchableOpacity
-            style={[styles.tab, tab === "stats" && styles.tabActive]}
-            onPress={() => setTab("stats")}
-          >
-            <Text
-              style={[styles.tabText, tab === "stats" && styles.tabTextActive]}
+          {[
+            { id: "stats", label: "Stats" },
+            { id: "game", label: "Game" },
+          ].map((t) => (
+            <TouchableOpacity
+              key={t.id}
+              style={[styles.tab, tab === t.id && styles.tabActive]}
+              onPress={() => setTab(t.id)}
             >
-              Stats
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, tab === "log" && styles.tabActive]}
-            onPress={() => setTab("log")}
-          >
-            <Text
-              style={[styles.tabText, tab === "log" && styles.tabTextActive]}
-            >
-              Log
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[styles.tabText, tab === t.id && styles.tabTextActive]}
+              >
+                {t.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-        {tab === "stats" ? renderStats() : renderLog()}
+        {tab === "stats" ? renderStats() : renderGame()}
       </ScrollView>
     </View>
   );
 };
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   tabs: {
@@ -797,7 +1021,6 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.h3, fontSize: 16, color: colors.warmBrown },
   cardMeta: { ...typography.bodySm, fontSize: 12, color: colors.outline },
 
-  // Week navigation
   weekNav: {
     flexDirection: "row",
     alignItems: "center",
@@ -841,7 +1064,6 @@ const styles = StyleSheet.create({
     color: colors.outline,
   },
 
-  // Month grid
   monthName: { ...typography.h3, fontSize: 16, color: colors.warmBrown },
   monthArrow: {
     width: 32,
@@ -869,36 +1091,39 @@ const styles = StyleSheet.create({
   },
   gridCell: { flex: 1, aspectRatio: 1, borderRadius: 4 },
 
-  // XP
-  mascotAvatar: { position: "relative" },
-  mascotImg: {
-    width: 70,
-    height: 70,
-    borderRadius: radii.lg,
-    backgroundColor: `${colors.primaryContainer}33`,
-  },
-  levelBadge: {
-    position: "absolute",
-    bottom: -4,
-    right: -4,
-    backgroundColor: colors.primary,
-    width: 26,
-    height: 26,
-    borderRadius: radii.full,
+  // ── Level / Title ──
+  titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  titleIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: radii["2xl"],
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
   },
-  levelText: { color: "#fff", fontWeight: "800", fontSize: 11 },
-  mascotName: { ...typography.h2, fontSize: 18, color: colors.warmBrown },
-  xpLabel: {
-    ...typography.bodySm,
-    fontSize: 11,
-    color: colors.outline,
-    marginTop: 6,
+  titleText: { ...typography.h2, fontSize: 20 },
+  levelBubble: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary,
+    borderRadius: radii["2xl"],
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 52,
   },
-  xpBar: {
+  levelBubbleLabel: {
+    ...typography.labelCaps,
+    color: "#fff",
+    fontSize: 8,
+    opacity: 0.8,
+  },
+  levelBubbleNum: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 22,
+    lineHeight: 26,
+  },
+
+  xpBarTrack: {
     height: 8,
     backgroundColor: colors.surfaceContainerHigh,
     borderRadius: 4,
@@ -909,40 +1134,57 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 4,
   },
-  xpText: {
-    ...typography.bodySm,
-    fontSize: 11,
-    color: colors.outline,
-    alignSelf: "flex-end",
-  },
-  rewardGrid: {
+  xpSubtext: { ...typography.bodySm, fontSize: 11, color: colors.outline },
+
+  statsStrip: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    justifyContent: "space-between",
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.lg,
+    padding: spacing.sm,
+    gap: 0,
   },
-  rewardCell: {
-    width: "31%",
-    aspectRatio: 1,
-    backgroundColor: `${colors.primaryContainer}15`,
+  statsStripItem: { flex: 1, alignItems: "center", gap: 3 },
+  statsStripValue: { ...typography.h3, fontSize: 16, color: colors.warmBrown },
+  statsStripLabel: {
+    ...typography.labelCaps,
+    fontSize: 8,
+    color: colors.outline,
+  },
+
+  // ── Badges ──
+  badgeGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  badgeCell: {
+    width: "30%",
+    alignItems: "center",
+    gap: 5,
+    padding: spacing.unit,
+  },
+  badgeLocked: { opacity: 0.45 },
+  badgeIconWrap: {
+    width: 44,
+    height: 44,
     borderRadius: radii.lg,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    padding: 6,
   },
-  rewardLocked: { backgroundColor: colors.surfaceContainerHigh, opacity: 0.6 },
-  rewardName: {
+  badgeName: {
     ...typography.labelCaps,
     fontSize: 9,
     color: colors.warmBrown,
     textAlign: "center",
   },
+  badgeDesc: {
+    ...typography.bodySm,
+    fontSize: 9,
+    color: colors.outline,
+    textAlign: "center",
+    lineHeight: 13,
+  },
 
-  // Log
+  // ── Log ──
   eyebrow: { ...typography.labelCaps, fontSize: 10, color: colors.primary },
-  title: { ...typography.h1, fontSize: 26, color: colors.warmBrown },
-  subtitle: {
+  logTitle: { ...typography.h1, fontSize: 26, color: colors.warmBrown },
+  logSubtitle: {
     ...typography.bodySm,
     color: colors.onSurfaceVariant,
     marginTop: 4,
@@ -974,6 +1216,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   emptyText: { ...typography.bodySm, color: colors.outline },
+
   logHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -987,11 +1230,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   warningIcon: { backgroundColor: `${colors.error}15` },
-  successIcon: { backgroundColor: "#D4F4DD" },
-  logTitle: { ...typography.h3, fontSize: 15, color: colors.warmBrown },
+  successIcon: { backgroundColor: `${colors.success}15` },
+  logItemTitle: { ...typography.h3, fontSize: 15, color: colors.warmBrown },
   logStatus: { ...typography.labelCaps, fontSize: 10, marginTop: 3 },
   warningText: { color: colors.error },
-  successText: { color: "#1F8A3F" },
+  successText: { color: colors.success },
   logTime: { ...typography.labelCaps, fontSize: 9, color: colors.outline },
   descriptionBox: {
     backgroundColor: colors.surfaceContainerLow,
@@ -1023,6 +1266,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.onSurfaceVariant,
   },
+
   summaryCard: {
     flex: 1,
     backgroundColor: colors.surfaceContainerLowest,
@@ -1037,6 +1281,34 @@ const styles = StyleSheet.create({
     ...typography.bodySm,
     fontSize: 11,
     color: colors.onSurfaceVariant,
+  },
+
+  audioName: {
+    ...typography.bodyMd,
+    fontSize: 14,
+    color: colors.onSurface,
+    fontWeight: "600",
+  },
+  audioSub: {
+    ...typography.bodySm,
+    fontSize: 12,
+    color: colors.outline,
+    marginTop: 2,
+  },
+  logCountPill: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: radii.full,
+    backgroundColor: `${colors.error}12`,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  logCountText: {
+    ...typography.labelCaps,
+    fontSize: 11,
+    color: colors.error,
+    fontWeight: "800",
   },
 });
 

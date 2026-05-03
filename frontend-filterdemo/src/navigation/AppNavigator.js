@@ -8,12 +8,15 @@ import { MaterialIcons } from "@expo/vector-icons";
 
 import HomeScreen from "../screens/HomeScreen";
 import ActiveSessionScreen from "../screens/ActiveSessionScreen";
+import GracePeriodScreen from "../screens/GracePeriodScreen";
 import StatsScreen from "../screens/StatsScreen";
 import CalendarScreen from "../screens/CalendarScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import SignInScreen from "../screens/SignInScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import SchoolScreen from "../screens/SchoolScreen";
+import SubscriptionScreen from "../screens/SubscriptionScreen";
+import OverrideLogScreen from "../screens/OverrideLogScreen";
 import {
   FilterSettingsScreen,
   CalendarSyncScreen,
@@ -100,34 +103,37 @@ const NO_HEADER = { headerShown: false };
 
 const HomeStack = () => (
   <Stack.Navigator screenOptions={NO_HEADER}>
-    <Stack.Screen name="Home" component={HomeScreen} />
+    <Stack.Screen name="HomeScreen" component={HomeScreen} />
     <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />
+    <Stack.Screen name="GracePeriod" component={GracePeriodScreen} />
   </Stack.Navigator>
 );
 
 const StatsStack = () => (
   <Stack.Navigator screenOptions={NO_HEADER}>
-    <Stack.Screen name="Stats" component={StatsScreen} />
+    <Stack.Screen name="StatsScreen" component={StatsScreen} />
+    <Stack.Screen name="OverrideLog" component={OverrideLogScreen} />
   </Stack.Navigator>
 );
 
 const CalendarStack = () => (
   <Stack.Navigator screenOptions={NO_HEADER}>
-    <Stack.Screen name="Calendar" component={CalendarScreen} />
+    <Stack.Screen name="CalendarScreen" component={CalendarScreen} />
   </Stack.Navigator>
 );
 
 const SchoolStack = () => (
   <Stack.Navigator screenOptions={NO_HEADER}>
-    <Stack.Screen name="School" component={SchoolScreen} />
+    <Stack.Screen name="SchoolScreen" component={SchoolScreen} />
   </Stack.Navigator>
 );
 
 const SettingsStack = () => (
   <Stack.Navigator screenOptions={NO_HEADER}>
-    <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
     <Stack.Screen name="FilterSettings" component={FilterSettingsScreen} />
     <Stack.Screen name="CalendarSync" component={CalendarSyncScreen} />
+    <Stack.Screen name="Subscription" component={SubscriptionScreen} />
   </Stack.Navigator>
 );
 

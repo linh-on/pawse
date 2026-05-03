@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Animated } from "react-native";
-import { tfidfClassify } from "./classifier";
+import {
+  tfidfClassify,
+  classifyWithContacts,
+  buildTrustedKeywords,
+} from "./classifier";
+import { supabase } from "../../lib/supabase";
 import { NOTIFICATION_POOL } from "./notifications";
 import { shuffle } from "./utils";
 
@@ -13,23 +18,45 @@ import { shuffle } from "./utils";
  * onUrgentDetected  – callback fired when an urgent notif appears (e.g. send to box)
  * onUrgentDismiss   – callback fired when modal is dismissed
  */
-export function useNotifSimulator({ onUrgentDetected, onUrgentDismiss }) {
+export function useNotifSimulator({
+  onUrgentDetected,
+  onUrgentDismiss,
+  userId,
+}) {
   const [feed, setFeed] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [urgentModal, setUrgentModal] = useState(null);
+  const [trustedKeywords, setTrustedKeywords] = useState([]);
   const [pool, setPool] = useState(() => shuffle(NOTIFICATION_POOL));
   const [poolIndex, setPoolIndex] = useState(0);
 
   const modalScale = useRef(new Animated.Value(0.85)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;
+  const trustedKeywordsRef = useRef([]);
   const poolRef = useRef(pool);
   const poolIndexRef = useRef(poolIndex);
   const isRunningRef = useRef(false);
   const intervalRef = useRef(null);
 
+  trustedKeywordsRef.current = trustedKeywords;
   poolRef.current = pool;
   poolIndexRef.current = poolIndex;
   isRunningRef.current = isRunning;
+
+  // Fetch trusted contacts when userId is available
+  useEffect(() => {
+    async function fetchContacts() {
+      if (!userId) return;
+      const { data, error } = await supabase
+        .from("trusted_contacts")
+        .select("name, note")
+        .eq("user_id", userId);
+      if (!error && data) {
+        setTrustedKeywords(buildTrustedKeywords(data));
+      }
+    }
+    fetchContacts();
+  }, [userId]);
 
   // Auto-fire interval. Stops when modal is open or paused.
   useEffect(() => {
@@ -57,13 +84,20 @@ export function useNotifSimulator({ onUrgentDetected, onUrgentDismiss }) {
     setPoolIndex(idx + 1);
     poolIndexRef.current = idx + 1;
 
-    const predicted = tfidfClassify(notif.text);
+    const predicted = classifyWithContacts(
+      notif.text,
+      trustedKeywordsRef.current,
+    );
+    const isTrusted = trustedKeywordsRef.current.some((kw) =>
+      notif.text.toLowerCase().includes(kw),
+    );
     const entry = {
       id: Date.now(),
       text: notif.text,
       trueLabel: notif.label,
       predicted,
       correct: predicted === notif.label,
+      isTrusted, // true = bypassed ML via trusted contact
     };
 
     if (predicted === "urgent") {
