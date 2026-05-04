@@ -6,7 +6,9 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  useWindowDimensions,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   ActivityIndicator,
   Alert,
@@ -22,12 +24,15 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
 const SignInScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
   const { setUser } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -70,113 +75,132 @@ const SignInScreen = () => {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.screen, { paddingTop: insets.top + spacing.unit }]}
+      style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={{ alignItems: "center", gap: spacing.sm }}>
-        <Image
-          source={require("../../assets/pawse_logo.png")}
-          style={styles.logo}
-        />
-        <Text style={styles.title}>Welcome to Pawse</Text>
-        <Text style={styles.subtitle}>Your smart focus companion</Text>
-      </View>
-
-      <View style={[patterns.card, shadows.card, { gap: spacing.sm }]}>
-        <Text style={styles.label}>Email</Text>
-        <View style={styles.inputWrap}>
-          <MaterialIcons name="mail-outline" size={20} color={colors.outline} />
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            placeholderTextColor={colors.outlineVariant}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: insets.top + spacing.md,
+            paddingBottom: insets.bottom + spacing.lg,
+            paddingHorizontal: r.screenPadding,
+          },
+        ]}
+      >
+        <View style={styles.hero}>
+          <Image
+            source={require("../../assets/pawse_logo.png")}
+            style={styles.logo}
           />
+          <Text style={styles.title}>Welcome to Pawse</Text>
+          <Text style={styles.subtitle}>Your smart focus companion</Text>
         </View>
 
-        <TouchableOpacity
+        <View
           style={[
-            patterns.buttonPrimary,
-            shadows.soft,
-            {
-              borderRadius: radii["2xl"],
-              marginTop: spacing.sm,
-              paddingVertical: 10,
-            },
-            loading && { opacity: 0.6 },
+            patterns.card,
+            shadows.card,
+            styles.formCard,
+            { maxWidth: r.contentMaxWidth },
           ]}
-          onPress={handleSignIn}
-          disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color={colors.onPrimaryContainer} />
-          ) : (
-            <Text style={styles.signInText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
+          <Text style={styles.label}>Email</Text>
+          <View style={styles.inputWrap}>
+            <MaterialIcons name="mail-outline" size={20} color={colors.outline} />
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              placeholderTextColor={colors.outlineVariant}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
 
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>QUICK DEMO</Text>
-          <View style={styles.dividerLine} />
-        </View>
+          <TouchableOpacity
+            style={[
+              patterns.buttonPrimary,
+              shadows.soft,
+              {
+                borderRadius: radii["2xl"],
+                marginTop: spacing.sm,
+                paddingVertical: 10,
+              },
+              loading && { opacity: 0.6 },
+            ]}
+            onPress={handleSignIn}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.onPrimaryContainer} />
+            ) : (
+              <Text style={styles.signInText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
 
-        {/* Role-based demo accounts */}
-        <View style={{ gap: 8 }}>
-          {[
-            {
-              email: "buddy@pawse.app",
-              label: "Student",
-              icon: "school",
-              color: colors.primary,
-            },
-            {
-              email: "teacher@pawse.app",
-              label: "Teacher",
-              icon: "cast-for-education",
-              color: colors.secondary,
-            },
-            {
-              email: "parent@pawse.app",
-              label: "Parent",
-              icon: "family-restroom",
-              color: colors.tertiary,
-            },
-          ].map(({ email: e, label, icon, color }) => (
-            <TouchableOpacity
-              key={e}
-              style={styles.demoBtn}
-              onPress={() => useDemoAccount(e)}
-            >
-              <View
-                style={[
-                  styles.demoRoleBadge,
-                  { backgroundColor: `${color}18` },
-                ]}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>QUICK DEMO</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={{ gap: 8 }}>
+            {[
+              {
+                email: "buddy@pawse.app",
+                label: "Student",
+                icon: "school",
+                color: colors.primary,
+              },
+              {
+                email: "teacher@pawse.app",
+                label: "Teacher",
+                icon: "cast-for-education",
+                color: colors.secondary,
+              },
+              {
+                email: "parent@pawse.app",
+                label: "Parent",
+                icon: "family-restroom",
+                color: colors.tertiary,
+              },
+            ].map(({ email: e, label, icon, color }) => (
+              <TouchableOpacity
+                key={e}
+                style={styles.demoBtn}
+                onPress={() => useDemoAccount(e)}
               >
-                <MaterialIcons name={icon} size={15} color={color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.demoBtnText}>{e}</Text>
-                <Text style={styles.demoRoleText}>{label}</Text>
-              </View>
-              <MaterialIcons
-                name="chevron-right"
-                size={16}
-                color={colors.outlineVariant}
-              />
-            </TouchableOpacity>
-          ))}
+                <View
+                  style={[
+                    styles.demoRoleBadge,
+                    { backgroundColor: `${color}18` },
+                  ]}
+                >
+                  <MaterialIcons name={icon} size={15} color={color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.demoBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>{e}</Text>
+                  <Text style={styles.demoRoleText}>{label}</Text>
+                </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={16}
+                  color={colors.outlineVariant}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Demo mode — no password required</Text>
-      </View>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Demo mode — no password required</Text>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -185,15 +209,21 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.surfaceContainerLow,
-    paddingHorizontal: spacing.containerPadding,
-    justifyContent: "space-between",
   },
-  logo: { width: 110, height: 110, resizeMode: "contain" },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    gap: spacing.md,
+  },
+  hero: { alignItems: "center", gap: spacing.xs },
+  formCard: { gap: spacing.sm, width: "100%", alignSelf: "center" },
+  logo: { width: 88, height: 88, resizeMode: "contain" },
   title: {
     ...typography.h1,
-    fontSize: 28,
+    fontSize: 26,
     color: colors.warmBrown,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
+    textAlign: "center",
   },
   subtitle: {
     ...typography.bodyMd,
@@ -273,8 +303,7 @@ const styles = StyleSheet.create({
 
   footer: {
     alignItems: "center",
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.xs,
   },
   footerText: {
     ...typography.bodySm,

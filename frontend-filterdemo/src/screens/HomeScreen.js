@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   TextInput,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -12,6 +13,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Header from "../components/Header";
 import { colors, spacing, radii, shadows, typography } from "../theme";
+import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 import { Picker } from "@react-native-picker/picker";
@@ -100,6 +102,8 @@ const dialStyles = StyleSheet.create({
 const HomeScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
   const { user } = useAuth();
 
   const [minutes, setMinutes] = useState(45);
@@ -227,7 +231,13 @@ const HomeScreen = () => {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: 120 + insets.bottom },
+          {
+            paddingBottom: 120 + insets.bottom,
+            paddingHorizontal: r.screenPadding,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -245,7 +255,7 @@ const HomeScreen = () => {
               size={22}
               color={colors.primaryContainer}
             />
-            <Text style={styles.statLabel}>TODAY</Text>
+            <Text style={styles.statLabel} numberOfLines={1}>TODAY</Text>
             <Text style={styles.statValue}>
               {loadingStats ? "..." : formatMinutes(todayMinutes)}
             </Text>
@@ -256,7 +266,7 @@ const HomeScreen = () => {
               size={22}
               color={colors.secondary}
             />
-            <Text style={styles.statLabel}>STREAK</Text>
+            <Text style={styles.statLabel} numberOfLines={1}>STREAK</Text>
             <Text style={styles.statValue}>
               {loadingStats ? "..." : `${streak} days`}
             </Text>
@@ -381,7 +391,6 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surfaceContainerLow },
   scroll: {
-    paddingHorizontal: spacing.containerPadding,
     paddingTop: spacing.md,
     gap: spacing.gutter,
   },
@@ -396,12 +405,13 @@ const styles = StyleSheet.create({
     color: colors.onSurfaceVariant,
     fontStyle: "italic",
   },
-  statsRow: { flexDirection: "row", gap: spacing.gutter },
+  statsRow: { flexDirection: "row", gap: 10 },
   statCard: {
     flex: 1,
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii["4xl"],
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     alignItems: "center",
     borderWidth: 1,
     borderColor: `${colors.orange}18`,
@@ -410,10 +420,12 @@ const styles = StyleSheet.create({
   statLabel: {
     ...typography.labelCaps,
     color: colors.onSurfaceVariant,
-    fontSize: 10,
+    fontSize: 9,
     marginTop: 4,
+    letterSpacing: 0.3,
+    textAlign: "center",
   },
-  statValue: { ...typography.h2, color: colors.warmBrown },
+  statValue: { ...typography.h2, color: colors.warmBrown, textAlign: "center" },
   sessionCard: {
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii["4xl"],

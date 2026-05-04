@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   Alert,
   ActivityIndicator,
 } from "react-native";
@@ -20,6 +21,7 @@ import {
   patterns,
   tint,
 } from "../theme";
+import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
@@ -84,6 +86,8 @@ const fmtDate = (iso) => {
 const SubscriptionScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
   const { user, setUser } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -199,7 +203,16 @@ const SubscriptionScreen = () => {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            paddingHorizontal: r.screenPadding,
+            paddingBottom: insets.bottom + 80,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Current plan card ── */}
@@ -454,8 +467,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.containerPadding,
     paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.containerPadding,
     borderBottomWidth: 1,
     borderBottomColor: `${colors.orange}18`,
   },
@@ -469,7 +482,6 @@ const styles = StyleSheet.create({
   },
   pageTitle: { ...typography.h3, color: colors.warmBrown },
   scroll: {
-    paddingHorizontal: spacing.containerPadding,
     paddingTop: spacing.md,
     paddingBottom: 60,
     gap: spacing.gutter,
@@ -479,7 +491,7 @@ const styles = StyleSheet.create({
   currentCard: {
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii["4xl"],
-    padding: spacing.md,
+    padding: spacing.sm,
     borderWidth: 1.5,
     gap: spacing.sm,
   },
@@ -496,10 +508,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   currentLabel: { ...typography.labelCaps, fontSize: 9, color: colors.outline },
-  currentName: { ...typography.h2, fontSize: 22 },
+  currentName: { ...typography.h2, fontSize: 20, flexShrink: 1 },
 
   priceBlock: { alignItems: "flex-end" },
-  priceAmount: { ...typography.h2, fontSize: 22 },
+  priceAmount: { ...typography.h2, fontSize: 20 },
   pricePeriod: { ...typography.bodySm, fontSize: 10, color: colors.outline },
 
   statusRow: { flexDirection: "row" },
@@ -522,7 +534,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  perkText: { ...typography.bodySm, color: colors.onSurface, flex: 1 },
+  perkText: {
+    ...typography.bodySm,
+    color: colors.onSurface,
+    flex: 1,
+    fontSize: 13,
+    flexShrink: 1,
+  },
 
   missingBlock: {
     backgroundColor: colors.surfaceContainerLow,
@@ -549,12 +567,12 @@ const styles = StyleSheet.create({
   otherCard: {
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii["3xl"],
-    padding: spacing.md,
+    padding: spacing.sm,
     borderWidth: 1,
     gap: spacing.sm,
   },
   otherCardTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  otherName: { ...typography.h3, fontSize: 18 },
+  otherName: { ...typography.h3, fontSize: 17, flexShrink: 1 },
 
   upgradeBtn: {
     borderRadius: radii["2xl"],

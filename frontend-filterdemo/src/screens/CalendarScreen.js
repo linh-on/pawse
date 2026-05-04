@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   TextInput,
   Alert,
 } from "react-native";
@@ -20,6 +21,7 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
@@ -127,6 +129,8 @@ const getEventIcon = (tag) => {
 
 const CalendarScreen = () => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
   const { user } = useAuth();
 
   const [events, setEvents] = useState([]);
@@ -243,7 +247,13 @@ const CalendarScreen = () => {
       <ScrollView
         contentContainerStyle={[
           patterns.scrollContent,
-          { paddingBottom: 120 + insets.bottom },
+          {
+            paddingBottom: 120 + insets.bottom,
+            paddingHorizontal: r.screenPadding,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -532,7 +542,14 @@ const CalendarScreen = () => {
                                 },
                               ]}
                             >
-                              <Text style={styles.eventTagText}>{e.tag}</Text>
+                              <Text
+                                style={styles.eventTagText}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.78}
+                              >
+                                {e.tag}
+                              </Text>
                             </View>
                           )}
                           {past && (
@@ -806,11 +823,13 @@ const styles = StyleSheet.create({
     color: colors.warmBrown,
     fontWeight: "700",
   },
-  eventSub: { ...typography.bodySm, fontSize: 12, color: colors.outline },
+  eventSub: { ...typography.bodySm, fontSize: 12, color: colors.outline, flexShrink: 1 },
   eventTagText: {
     ...typography.labelCaps,
-    fontSize: 9,
+    fontSize: 8.5,
     color: colors.tertiary,
+    includeFontPadding: false,
+    maxWidth: 88,
   },
   deleteBtn: { padding: 4, marginTop: 2 },
 

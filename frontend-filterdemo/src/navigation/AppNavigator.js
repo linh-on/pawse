@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -34,6 +34,8 @@ const TAB_ITEMS = [
 
 const CustomTabBar = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const compactTabs = width < 340;
 
   return (
     <View style={[tabStyles.bar, { paddingBottom: insets.bottom + 8 }]}>
@@ -54,9 +56,16 @@ const CustomTabBar = ({ state, navigation }) => {
               size={22}
               color={isFocused ? colors.orange : colors.outline}
             />
-            <Text style={[tabStyles.label, isFocused && tabStyles.labelActive]}>
-              {item.label}
-            </Text>
+            {!compactTabs && (
+              <Text
+                style={[tabStyles.label, isFocused && tabStyles.labelActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {item.label}
+              </Text>
+            )}
           </TouchableOpacity>
         );
       })}
@@ -71,7 +80,7 @@ const tabStyles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingTop: 12,
-    paddingHorizontal: spacing.gutter,
+    paddingHorizontal: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: `${colors.orange}18`,
     ...shadows.soft,
@@ -81,16 +90,18 @@ const tabStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,
-    paddingHorizontal: 6,
-    gap: 4,
+    paddingHorizontal: 4,
+    gap: 3,
     borderRadius: radii.xl,
   },
   itemActive: { backgroundColor: `${colors.orange}18` },
   label: {
     ...typography.labelCaps,
-    fontSize: 9,
+    fontSize: 8.5,
     color: colors.outline,
-    letterSpacing: 0.6,
+    letterSpacing: 0.35,
+    includeFontPadding: false,
+    textAlign: "center",
   },
   labelActive: { color: colors.orange },
 });

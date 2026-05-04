@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   TextInput,
   Alert,
 } from "react-native";
@@ -20,6 +21,7 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
@@ -69,6 +71,8 @@ const formatFocused = (minutes) => {
 const ProfileScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
   const { user, setUser } = useAuth();
 
   const [name, setName] = useState(user?.name || "");
@@ -162,7 +166,13 @@ const ProfileScreen = () => {
       <ScrollView
         contentContainerStyle={[
           patterns.scrollContent,
-          { paddingBottom: insets.bottom + spacing.xl },
+          {
+            paddingBottom: insets.bottom + spacing.xl,
+            paddingHorizontal: r.screenPadding,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >

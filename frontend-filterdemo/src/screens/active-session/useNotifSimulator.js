@@ -234,6 +234,8 @@ export function useNotifSimulator({
     // Actions
     fireNext,
     togglePlay: () => setIsRunning((v) => !v),
+    start: () => setIsRunning(true),
+    stop: () => setIsRunning(false),
     dismissModal,
     clearModal,
     requestPermission,

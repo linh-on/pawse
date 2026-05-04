@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Animated,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -24,6 +25,7 @@ import { usePawseBox } from "../hooks/usePawseBox";
 import { colors, spacing, radii, shadows, typography } from "../theme";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
+import { responsive } from "../utils/responsive";
 
 import { fmt, parseTime } from "./active-session/utils";
 import { useNotifSimulator } from "./active-session/useNotifSimulator";
@@ -34,6 +36,10 @@ const ActiveSessionScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
+  const timerSize = r.timerSize;
+  const timerFaceSize = Math.max(190, timerSize - 48);
 
   const { user } = useAuth();
   const {
@@ -182,7 +188,13 @@ const ActiveSessionScreen = () => {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: insets.bottom + spacing.xl },
+          {
+            paddingBottom: insets.bottom + spacing.xl,
+            paddingHorizontal: r.screenPadding,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -217,13 +229,19 @@ const ActiveSessionScreen = () => {
           style={[styles.ringWrap, { transform: [{ scale: pulseAnim }] }]}
         >
           <CircularProgress
-            size={288}
+            size={timerSize}
             strokeWidth={10}
             progress={progress}
             trackColor={colors.surfaceContainerHighest}
             fillColor={colors.primaryContainer}
           >
-            <View style={[styles.timerFace, shadows.timer]}>
+            <View
+              style={[
+                styles.timerFace,
+                shadows.timer,
+                { width: timerFaceSize, height: timerFaceSize, borderRadius: timerFaceSize / 2 },
+              ]}
+            >
               <MaterialIcons
                 name="lock"
                 size={30}
@@ -276,7 +294,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   scroll: {
     alignItems: "center",
-    paddingHorizontal: spacing.containerPadding,
     paddingTop: spacing.xl,
     gap: spacing.lg,
   },

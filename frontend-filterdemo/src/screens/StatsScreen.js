@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -19,6 +20,7 @@ import {
   patterns,
   tint,
 } from "../theme";
+import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
@@ -390,6 +392,8 @@ const buildLogItems = (sessions) => {
 const StatsScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
   const { user } = useAuth();
 
   const [tab, setTab] = useState("stats");
@@ -931,7 +935,13 @@ const StatsScreen = () => {
       <ScrollView
         contentContainerStyle={[
           patterns.scrollContent,
-          { paddingBottom: 120 + insets.bottom },
+          {
+            paddingBottom: 120 + insets.bottom,
+            paddingHorizontal: r.screenPadding,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >

@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   Switch,
   StatusBar,
   Modal,
@@ -24,6 +25,7 @@ import {
   patterns,
   tint,
 } from "../theme";
+import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
@@ -31,6 +33,8 @@ import { useAuth } from "../lib/AuthContext";
 export const FilterSettingsScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
   const { user } = useAuth();
 
   // ── App notification toggles ──
@@ -167,70 +171,16 @@ export const FilterSettingsScreen = () => {
       <ScrollView
         contentContainerStyle={[
           patterns.scrollContent,
-          { paddingBottom: 120 + insets.bottom },
+          {
+            paddingBottom: 120 + insets.bottom,
+            paddingHorizontal: r.screenPadding,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Brain card */}
-        <View
-          style={[
-            patterns.card,
-            shadows.card,
-            {
-              alignItems: "center",
-              gap: spacing.sm,
-              borderColor: `${colors.orange}22`,
-            },
-          ]}
-        >
-          <View style={styles.brainIconWrap}>
-            <MaterialIcons
-              name="psychology"
-              size={32}
-              color={colors.secondary}
-            />
-            <View style={styles.brainBadge}>
-              <MaterialIcons name="bolt" size={12} color="#fff" />
-            </View>
-          </View>
-          <Text style={styles.brainTitle}>Your Smart Filter</Text>
-          <Text style={styles.brainText}>
-            I use AI to sort through your notifications. Urgent messages get
-            through. Everything else waits. Trusted contacts always get through
-            — no AI needed.
-          </Text>
-        </View>
-
-        {/* App Notifications */}
-        <View style={{ gap: spacing.sm }}>
-          <View style={patterns.sectionHeader}>
-            <Text style={styles.sectionTitle}>App Notifications</Text>
-            <Text style={styles.urgentOnly}>Urgent Only</Text>
-          </View>
-          {APPS.map((app) => (
-            <View key={app.id} style={[patterns.row, shadows.card]}>
-              <View
-                style={[styles.rowIcon, { backgroundColor: `${app.color}18` }]}
-              >
-                <MaterialIcons name={app.icon} size={20} color={app.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowName}>{app.name}</Text>
-                <Text style={styles.rowSub}>{app.sub}</Text>
-              </View>
-              <Switch
-                value={apps[app.id]}
-                onValueChange={(v) => setApps((p) => ({ ...p, [app.id]: v }))}
-                trackColor={{
-                  false: colors.surfaceContainerHigh,
-                  true: colors.secondary,
-                }}
-                thumbColor="#fff"
-              />
-            </View>
-          ))}
-        </View>
-
         {/* Trusted Contacts */}
         <View style={{ gap: spacing.sm }}>
           <View style={patterns.sectionHeader}>
@@ -310,6 +260,37 @@ export const FilterSettingsScreen = () => {
               </View>
             ))
           )}
+        </View>
+
+        {/* App Notifications */}
+        <View style={{ gap: spacing.sm }}>
+          <View style={patterns.sectionHeader}>
+            <Text style={styles.sectionTitle}>App Notifications</Text>
+            <Text style={styles.comingSoonTag}>Coming soon</Text>
+          </View>
+          {APPS.map((app) => (
+            <View key={app.id} style={[patterns.row, shadows.card]}>
+              <View
+                style={[styles.rowIcon, { backgroundColor: `${app.color}18` }]}
+              >
+                <MaterialIcons name={app.icon} size={20} color={app.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowName}>{app.name}</Text>
+                <Text style={styles.rowSub}>{app.sub}</Text>
+              </View>
+              <Switch
+                value={apps[app.id]}
+                disabled
+                onValueChange={(v) => setApps((p) => ({ ...p, [app.id]: v }))}
+                trackColor={{
+                  false: colors.surfaceContainerHigh,
+                  true: colors.secondary,
+                }}
+                thumbColor="#fff"
+              />
+            </View>
+          ))}
         </View>
       </ScrollView>
 
@@ -512,7 +493,16 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: { ...typography.h3, fontSize: 17, color: colors.warmBrown },
-  urgentOnly: { ...typography.labelCaps, fontSize: 11, color: colors.primary },
+  comingSoonTag: {
+    ...typography.labelCaps,
+    fontSize: 10,
+    color: colors.outline,
+    backgroundColor: colors.surfaceContainerHigh,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    overflow: "hidden",
+  },
   addNew: { ...typography.bodySm, color: colors.primary, fontWeight: "700" },
 
   rowIcon: {

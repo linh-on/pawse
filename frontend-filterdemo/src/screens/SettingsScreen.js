@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   TextInput,
 } from "react-native";
 
@@ -20,6 +21,7 @@ import {
   typography,
   patterns,
 } from "../theme";
+import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 
@@ -31,6 +33,8 @@ const THEMES = [
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
   const { user } = useAuth();
 
   const theme = "classic";
@@ -81,7 +85,13 @@ const SettingsScreen = () => {
       <ScrollView
         contentContainerStyle={[
           patterns.scrollContent,
-          { paddingBottom: 120 + insets.bottom },
+          {
+            paddingBottom: 120 + insets.bottom,
+            paddingHorizontal: r.screenPadding,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -96,24 +106,10 @@ const SettingsScreen = () => {
             },
           ]}
         >
-          <View
-            style={[
-              patterns.rowBetween,
-              { alignItems: "flex-start", gap: spacing.sm },
-            ]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.planLabel}>ACTIVE PLAN</Text>
-              <Text style={styles.planTitle}>{planName}</Text>
-              <Text style={styles.planSub}>{planSub}</Text>
-            </View>
-            <View style={styles.planStar}>
-              <MaterialIcons
-                name={isFree ? "lock-open" : "workspace-premium"}
-                size={20}
-                color={isFree ? colors.outline : colors.primary}
-              />
-            </View>
+          <View style={{ gap: 2 }}>
+            <Text style={styles.planLabel}>ACTIVE PLAN</Text>
+            <Text style={styles.planTitle}>{planName}</Text>
+            <Text style={styles.planSub}>{planSub}</Text>
           </View>
           <TouchableOpacity
             style={styles.manageBtn}
@@ -247,8 +243,6 @@ const styles = StyleSheet.create({
   // Plan card — uses tinted variant of patterns.card
   planCard: {
     ...patterns.card,
-    backgroundColor: `${colors.primaryContainer}22`,
-    borderColor: `${colors.orange}33`,
     gap: spacing.sm,
   },
   planLabel: { ...typography.labelCaps, color: colors.primary, fontSize: 10 },
@@ -262,10 +256,6 @@ const styles = StyleSheet.create({
     ...typography.bodySm,
     color: colors.onSurfaceVariant,
     marginTop: 4,
-  },
-  planStar: {
-    ...patterns.circleIcon,
-    backgroundColor: `${colors.primaryContainer}55`,
   },
   manageBtn: {
     ...patterns.buttonPrimary,

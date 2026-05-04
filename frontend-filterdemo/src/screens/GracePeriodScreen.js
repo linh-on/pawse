@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Animated,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import Header from "../components/Header";
 import { colors, spacing, radii, shadows, typography } from "../theme";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
+import { responsive } from "../utils/responsive";
 import { fmt } from "./active-session/utils";
 
 const DEFAULT_GRACE_SECONDS = 10 * 60;
@@ -24,6 +26,10 @@ const GracePeriodScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const r = responsive(width);
+  const timerSize = r.timerSize;
+  const timerFaceSize = Math.max(190, timerSize - 48);
   const { user } = useAuth();
 
   const {
@@ -135,7 +141,13 @@ const GracePeriodScreen = () => {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: insets.bottom + 160 },
+          {
+            paddingHorizontal: r.screenPadding,
+            paddingBottom: insets.bottom + 160,
+            maxWidth: r.contentMaxWidth,
+            width: "100%",
+            alignSelf: "center",
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -150,7 +162,7 @@ const GracePeriodScreen = () => {
           style={[styles.ringWrap, { transform: [{ scale: pulseAnim }] }]}
         >
           <CircularProgress
-            size={288}
+            size={timerSize}
             strokeWidth={10}
             progress={graceProgress}
             trackColor={colors.surfaceContainerHighest}
@@ -159,7 +171,12 @@ const GracePeriodScreen = () => {
             <View
               style={[
                 styles.timerFace,
-                { borderColor: `${colors.error}22` },
+                {
+                  width: timerFaceSize,
+                  height: timerFaceSize,
+                  borderRadius: timerFaceSize / 2,
+                  borderColor: `${colors.error}22`,
+                },
                 shadows.timer,
               ]}
             >
@@ -220,16 +237,17 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   scroll: {
     alignItems: "center",
-    paddingHorizontal: spacing.containerPadding,
     paddingTop: spacing.xl,
     gap: spacing.lg,
   },
-  titleBlock: { alignItems: "center", gap: 6 },
+  titleBlock: { alignItems: "center", gap: 6, width: "100%" },
   title: { ...typography.h2, color: colors.onSurface },
   subtitle: {
     ...typography.bodySm,
     color: colors.onSurfaceVariant,
     textAlign: "center",
+    maxWidth: 320,
+    lineHeight: 20,
   },
   ringWrap: { alignItems: "center" },
   timerFace: {
@@ -252,8 +270,9 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
+    maxWidth: "100%",
   },
-  pausedText: { ...typography.bodySm, color: colors.outline },
+  pausedText: { ...typography.bodySm, color: colors.outline, flexShrink: 1 },
   continueBtn: {
     backgroundColor: colors.primaryContainer,
     borderRadius: radii["3xl"],
