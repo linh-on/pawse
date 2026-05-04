@@ -1,24 +1,38 @@
 import { useState, useEffect, useRef } from "react";
-import { Animated } from "react-native";
 import {
-  tfidfClassify,
-  classifyWithContacts,
-  buildTrustedKeywords,
-} from "./classifier";
+  Animated,
+  NativeModules,
+  NativeEventEmitter,
+  Platform,
+} from "react-native";
+import { classifyWithContacts, buildTrustedKeywords } from "./classifier";
 import { supabase } from "../../lib/supabase";
 import { NOTIFICATION_POOL } from "./notifications";
 import { shuffle } from "./utils";
 
+const { PawseNotifModule } = NativeModules;
+
+// Safe emitter — only constructed when the native module is actually present
+const notifEmitter =
+  PawseNotifModule && Platform.OS === "android"
+    ? new NativeEventEmitter(PawseNotifModule)
+    : null;
+
 /**
  * useNotifSimulator
  *
- * Owns all the notification simulation state — pool, feed, modal, auto-fire.
- * Returns the values + handlers the screen needs.
+ * On Android (with notification access granted):
+ *   - Listens to real notifications via PawseNotificationService
+ *   - "isRunning" gates whether incoming notifications are processed
+ *   - "fireNext" manually injects the next sim notification (for testing)
  *
- * onUrgentDetected  – callback fired when an urgent notif appears (e.g. send to box)
- * onUrgentDismiss   – callback fired when modal is dismissed
+ * Fallback (iOS / permission denied / native module missing):
+ *   - Behaves exactly like the original sim with the NOTIFICATION_POOL
+ *
+ * API surface is identical to the old hook so no other files need changes.
  */
 export function useNotifSimulator({
+  onNotificationClassified,
   onUrgentDetected,
   onUrgentDismiss,
   userId,
@@ -27,23 +41,31 @@ export function useNotifSimulator({
   const [isRunning, setIsRunning] = useState(false);
   const [urgentModal, setUrgentModal] = useState(null);
   const [trustedKeywords, setTrustedKeywords] = useState([]);
+  const [hasPermission, setHasPermission] = useState(false);
+  const [mode, setMode] = useState("sim"); // "real" | "sim"
+
+  // Sim pool state (used in sim mode or as manual fireNext)
   const [pool, setPool] = useState(() => shuffle(NOTIFICATION_POOL));
   const [poolIndex, setPoolIndex] = useState(0);
 
   const modalScale = useRef(new Animated.Value(0.85)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;
+
+  // Refs so callbacks always see latest values without re-registering listeners
   const trustedKeywordsRef = useRef([]);
+  const isRunningRef = useRef(false);
   const poolRef = useRef(pool);
   const poolIndexRef = useRef(poolIndex);
-  const isRunningRef = useRef(false);
   const intervalRef = useRef(null);
+  const urgentModalRef = useRef(null);
 
   trustedKeywordsRef.current = trustedKeywords;
+  isRunningRef.current = isRunning;
   poolRef.current = pool;
   poolIndexRef.current = poolIndex;
-  isRunningRef.current = isRunning;
+  urgentModalRef.current = urgentModal;
 
-  // Fetch trusted contacts when userId is available
+  // ── Fetch trusted contacts ──────────────────────────────────────────────
   useEffect(() => {
     async function fetchContacts() {
       if (!userId) return;
@@ -51,23 +73,77 @@ export function useNotifSimulator({
         .from("trusted_contacts")
         .select("name, note")
         .eq("user_id", userId);
-      if (!error && data) {
-        setTrustedKeywords(buildTrustedKeywords(data));
-      }
+      if (!error && data) setTrustedKeywords(buildTrustedKeywords(data));
     }
     fetchContacts();
   }, [userId]);
 
-  // Auto-fire interval. Stops when modal is open or paused.
+  // ── Check Android notification permission ───────────────────────────────
   useEffect(() => {
+    if (!PawseNotifModule || Platform.OS !== "android") return;
+
+    PawseNotifModule.hasPermission().then((granted) => {
+      setHasPermission(granted);
+      setMode(granted ? "real" : "sim");
+    });
+  }, []);
+
+  // ── Listen to real notifications (Android + permission granted) ─────────
+  useEffect(() => {
+    if (mode !== "real" || !notifEmitter) return;
+
+    const sub = notifEmitter.addListener("PawseNotification", (event) => {
+      // Only process notifications when session is running
+      if (!isRunningRef.current) return;
+
+      const text = event.text || "";
+      if (!text.trim()) return;
+
+      handleIncoming(text, null); // no trueLabel for real notifs
+    });
+
+    return () => sub.remove();
+  }, [mode]);
+
+  // ── Sim auto-fire interval (sim mode only) ──────────────────────────────
+  useEffect(() => {
+    if (mode !== "sim") return;
+
     if (!isRunning) {
       clearInterval(intervalRef.current);
       return;
     }
+
     intervalRef.current = setInterval(() => fireNext(), 2800);
     return () => clearInterval(intervalRef.current);
-  }, [isRunning]);
+  }, [isRunning, mode]);
 
+  // ── Core: classify + route a notification ───────────────────────────────
+  function handleIncoming(text, trueLabel) {
+    const predicted = classifyWithContacts(text, trustedKeywordsRef.current);
+    const isTrusted = trustedKeywordsRef.current.some((kw) =>
+      text.toLowerCase().includes(kw),
+    );
+
+    const entry = {
+      id: Date.now() + Math.random(),
+      text,
+      trueLabel, // null for real notifications
+      predicted,
+      correct: trueLabel ? predicted === trueLabel : null,
+      isTrusted,
+    };
+
+    onNotificationClassified?.(entry);
+
+    if (predicted === "urgent") {
+      showModal(entry);
+    } else {
+      setFeed((prev) => [entry, ...prev].slice(0, 20));
+    }
+  }
+
+  // ── Manual fire (injects next sim notification regardless of mode) ───────
   function fireNext() {
     let idx = poolIndexRef.current;
     let currentPool = poolRef.current;
@@ -84,29 +160,10 @@ export function useNotifSimulator({
     setPoolIndex(idx + 1);
     poolIndexRef.current = idx + 1;
 
-    const predicted = classifyWithContacts(
-      notif.text,
-      trustedKeywordsRef.current,
-    );
-    const isTrusted = trustedKeywordsRef.current.some((kw) =>
-      notif.text.toLowerCase().includes(kw),
-    );
-    const entry = {
-      id: Date.now(),
-      text: notif.text,
-      trueLabel: notif.label,
-      predicted,
-      correct: predicted === notif.label,
-      isTrusted, // true = bypassed ML via trusted contact
-    };
-
-    if (predicted === "urgent") {
-      showModal(entry);
-    } else {
-      setFeed((prev) => [entry, ...prev].slice(0, 20));
-    }
+    handleIncoming(notif.text, notif.label);
   }
 
+  // ── Modal helpers ────────────────────────────────────────────────────────
   function showModal(entry) {
     clearInterval(intervalRef.current);
     setUrgentModal(entry);
@@ -130,7 +187,7 @@ export function useNotifSimulator({
   }
 
   function dismissModal() {
-    if (isRunningRef.current) {
+    if (isRunningRef.current && mode === "sim") {
       intervalRef.current = setInterval(() => fireNext(), 2800);
     }
     onUrgentDismiss?.();
@@ -140,7 +197,9 @@ export function useNotifSimulator({
       duration: 150,
       useNativeDriver: true,
     }).start(() => {
-      if (urgentModal) setFeed((prev) => [urgentModal, ...prev].slice(0, 20));
+      if (urgentModalRef.current) {
+        setFeed((prev) => [urgentModalRef.current, ...prev].slice(0, 20));
+      }
       setUrgentModal(null);
     });
   }
@@ -150,9 +209,17 @@ export function useNotifSimulator({
       toValue: 0,
       duration: 150,
       useNativeDriver: true,
-    }).start(() => {
-      setUrgentModal(null);
-    });
+    }).start(() => setUrgentModal(null));
+  }
+
+  // ── Request permission helper (call from UI) ─────────────────────────────
+  async function requestPermission() {
+    if (!PawseNotifModule) return;
+    await PawseNotifModule.openSettings();
+    // Re-check after user returns from settings
+    const granted = await PawseNotifModule.hasPermission();
+    setHasPermission(granted);
+    setMode(granted ? "real" : "sim");
   }
 
   return {
@@ -161,9 +228,14 @@ export function useNotifSimulator({
     urgentModal,
     modalScale,
     modalOpacity,
+    // Mode info for UI
+    mode, // "real" | "sim"
+    hasPermission,
+    // Actions
     fireNext,
     togglePlay: () => setIsRunning((v) => !v),
     dismissModal,
     clearModal,
+    requestPermission,
   };
 }

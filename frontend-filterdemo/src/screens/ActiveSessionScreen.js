@@ -1,3 +1,10 @@
+// ActiveSessionScreen.js — only the NotifPanel call and sim hook usage changed.
+// Everything else is identical to the original.
+//
+// Changes vs original:
+//   1. sim now returns mode, hasPermission, requestPermission
+//   2. NotifPanel receives those three new props
+
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -73,18 +80,14 @@ const ActiveSessionScreen = () => {
     userId: user?.id,
   });
 
-  // Create a DB session only for a brand-new focus session.
-  // When returning from GracePeriod, reuse the existing session id.
   useEffect(() => {
     let mounted = true;
-
     const createSession = async () => {
       if (!user?.id) return;
       if (existingSessionId) {
         dbSessionIdRef.current = existingSessionId;
         return;
       }
-
       const { data, error } = await supabase
         .from("sessions")
         .insert({
@@ -95,17 +98,13 @@ const ActiveSessionScreen = () => {
         })
         .select("id")
         .single();
-
       if (error) {
         console.warn("Could not create focus session:", error.message);
         return;
       }
-
       if (mounted) dbSessionIdRef.current = data.id;
     };
-
     createSession();
-
     return () => {
       mounted = false;
     };
@@ -114,16 +113,13 @@ const ActiveSessionScreen = () => {
   const finishDbSession = async (completed) => {
     if (!dbSessionIdRef.current || sessionFinishedRef.current) return;
     sessionFinishedRef.current = true;
-
     const { error } = await supabase
       .from("sessions")
       .update({ ended_at: new Date().toISOString(), completed })
       .eq("id", dbSessionIdRef.current);
-
     if (error) console.warn("Could not update focus session:", error.message);
   };
 
-  // Tell box to start when first connected.
   useEffect(() => {
     if (connected && !sessionStartedRef.current) {
       actions.startSession(Math.ceil(localRemaining / 60));
@@ -131,19 +127,15 @@ const ActiveSessionScreen = () => {
     }
   }, [connected, localRemaining]);
 
-  // Local fallback countdown.
   useEffect(() => {
     if (connected) return;
-
     const id = setInterval(
       () => setLocalRemaining((r) => (r > 0 ? r - 1 : 0)),
       1000,
     );
-
     return () => clearInterval(id);
   }, [connected]);
 
-  // Glow pulse.
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -165,21 +157,17 @@ const ActiveSessionScreen = () => {
   const displayTime = connected ? boxRemaining : fmt(localRemaining);
   const progress = TOTAL_SECONDS > 0 ? remainingSecs / TOTAL_SECONDS : 0;
 
-  // Timer finished.
   useEffect(() => {
     if (remainingSecs <= 0 && !hasNavigatedRef.current) {
       hasNavigatedRef.current = true;
       sim.clearModal();
-      finishDbSession(true).then(() => {
-        navigation.replace("HomeScreen");
-      });
+      finishDbSession(true).then(() => navigation.replace("HomeScreen"));
     }
   }, [remainingSecs, sim, navigation]);
 
   function goToGracePeriod() {
     if (connected) actions.respondUrgent(true);
     sim.clearModal();
-
     navigation.replace("GracePeriod", {
       durationMinutes,
       remainingSeconds: remainingSecs,
@@ -200,7 +188,9 @@ const ActiveSessionScreen = () => {
       >
         <View style={styles.titleBlock}>
           <Text style={styles.title}>Deep Focus Session</Text>
-          <Text style={styles.subtitle}>Your phone is tucked away for a while.</Text>
+          <Text style={styles.subtitle}>
+            Your phone is tucked away for a while.
+          </Text>
           <View style={styles.boxIndicator}>
             <View
               style={[
@@ -246,11 +236,15 @@ const ActiveSessionScreen = () => {
           </CircularProgress>
         </Animated.View>
 
+        {/* ── Updated NotifPanel call — passes mode + permission props ── */}
         <NotifPanel
           feed={sim.feed}
           isRunning={sim.isRunning}
+          mode={sim.mode}
+          hasPermission={sim.hasPermission}
           onTogglePlay={sim.togglePlay}
           onFireNext={sim.fireNext}
+          onRequestPermission={sim.requestPermission}
         />
 
         <TouchableOpacity
