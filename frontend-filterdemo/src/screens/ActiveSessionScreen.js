@@ -50,7 +50,7 @@ const ActiveSessionScreen = () => {
 
   const TOTAL_SECONDS = durationMinutes * 60;
 
-  const { connected, remaining: boxRemaining, actions } = usePawseBox();
+  const { connected, state: boxState, remaining: boxRemaining, actions } = usePawseBox();
 
   const [localRemaining, setLocalRemaining] = useState(
     typeof initialRemainingSeconds === "number"
@@ -160,6 +160,21 @@ const ActiveSessionScreen = () => {
   }, [pulseAnim]);
 
   const remainingSecs = connected ? parseTime(boxRemaining) : localRemaining;
+
+  // Auto-dismiss the urgent modal when the hardware resolves it (user pressed
+  // Yes/No on the physical buttons). The box state leaves "URGENT" → "LOCKED".
+  const prevBoxState = useRef(boxState);
+  useEffect(() => {
+    if (
+      connected &&
+      prevBoxState.current === "URGENT" &&
+      boxState !== "URGENT" &&
+      sim.urgentModal
+    ) {
+      sim.dismissModal();
+    }
+    prevBoxState.current = boxState;
+  }, [boxState, connected, sim]);
   const displayTime = connected ? boxRemaining : fmt(localRemaining);
   const progress = TOTAL_SECONDS > 0 ? remainingSecs / TOTAL_SECONDS : 0;
 

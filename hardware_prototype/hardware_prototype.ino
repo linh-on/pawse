@@ -33,6 +33,65 @@ const unsigned long DEBOUNCE_MS = 300;
 //  store time left after unlock
 unsigned long resumeRemaining = 0;
 
+// ── LCD Scroll State ──────────────────────────────────────
+#define LCD_COLS 16
+#define SCROLL_DELAY_MS 350
+#define SCROLL_INITIAL_PAUSE_MS 1200
+
+String scrollText = "";
+int scrollPos = 0;
+unsigned long lastScrollTime = 0;
+bool scrollActive = false;
+
+void startScroll(const String& msg) {
+  scrollPos = 0;
+  lastScrollTime = millis();
+
+  // Row 0: fixed label
+  lcd.setCursor(0, 0);
+  lcd.print("URGENT ALERT!   ");
+
+  // Row 1: message
+  lcd.setCursor(0, 1);
+  lcd.print("                ");
+  lcd.setCursor(0, 1);
+
+  if (msg.length() <= LCD_COLS) {
+    // Fits — just print it, no scrolling
+    lcd.print(msg);
+    scrollActive = false;
+  } else {
+    lcd.print(msg.substring(0, LCD_COLS));
+    scrollText = msg + "    ";  // 4-space gap before wrap
+    scrollActive = true;
+  }
+}
+
+void tickScroll() {
+  if (!scrollActive) return;
+
+  unsigned long now = millis();
+  unsigned long d = (scrollPos == 0) ? SCROLL_INITIAL_PAUSE_MS : SCROLL_DELAY_MS;
+  if (now - lastScrollTime < d) return;
+  lastScrollTime = now;
+
+  scrollPos++;
+  if (scrollPos >= (int)scrollText.length()) {
+    scrollPos = 0;
+  }
+
+  lcd.setCursor(0, 1);
+  for (int i = 0; i < LCD_COLS; i++) {
+    int idx = (scrollPos + i) % scrollText.length();
+    lcd.print(scrollText.charAt(idx));
+  }
+}
+
+void stopScroll() {
+  scrollActive = false;
+  scrollPos = 0;
+}
+
 // ── Helpers ───────────────────────────────────────────────
 void setLock(bool unlock) {
   if (unlock) {
@@ -195,7 +254,7 @@ void handleUrgent() {
   if (server.hasArg("msg") && state == LOCKED) {
     urgentMsg = server.arg("msg");
     state = URGENT;
-    lcdShow(urgentMsg, "Yes=Unlock No=No");
+    startScroll(urgentMsg);
   }
   server.send(200, "text/plain", "OK");
 }
@@ -203,13 +262,14 @@ void handleUrgent() {
 void handleRespond() {
   if (server.hasArg("choice")) {
     if (server.arg("choice") == "yes") {
-      // check remaining time before unlocking
+      stopScroll();
       resumeRemaining = (sessionEnd > millis()) ? (sessionEnd - millis()) : 0;
       setLock(true);
       state = RESUME;
       String remStr = formatTime(resumeRemaining / 1000);
       lcdShow("Continue? Y/N ", remStr + " left");
     } else {
+      stopScroll();
       state = LOCKED;
       urgentMsg = "";
       refreshCountdown();
@@ -293,10 +353,16 @@ void loop() {
     lcdShow("  Times Up!   ", "  Unlocked!   ");
   }
 
+  // Scroll the urgent message on the LCD
+  if (state == URGENT) {
+    tickScroll();
+  }
+
   // Physical buttons
   if (state == URGENT && now - lastDebounce > DEBOUNCE_MS) {
     if (digitalRead(YES_PIN) == LOW) {
       lastDebounce = now;
+      stopScroll();
       resumeRemaining = (sessionEnd > millis()) ? (sessionEnd - millis()) : 0;
       setLock(true);
       state = RESUME;
@@ -304,6 +370,7 @@ void loop() {
       lcdShow("Continue? Y/N", remStr + " left");
     } else if (digitalRead(NO_PIN) == LOW) {
       lastDebounce = now;
+      stopScroll();
       state = LOCKED;
       urgentMsg = "";
       refreshCountdown();
