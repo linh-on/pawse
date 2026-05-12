@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import {
 import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
+import { usePawseBox } from "../context/PawseBoxContext";
 
 const formatTime = (dateString) => {
   if (!dateString) return "";
@@ -57,7 +58,9 @@ const buildOverrideLogItems = (sessions) => {
         type: "override",
         title: isCall ? "Call Override" : "Emergency Alert",
         status: isCall ? "Incoming Priority" : "Override Triggered",
-        description: text ? `"${text}"` : "Urgent notification was allowed through.",
+        description: text
+          ? `"${text}"`
+          : "Urgent notification was allowed through.",
         time: formatTime(log.fired_at),
         icon: isCall ? "call" : "priority-high",
         duration: `Session: ${session.duration_minutes || 0} mins`,
@@ -92,7 +95,23 @@ const OverrideLogScreen = () => {
   const r = responsive(width);
   const { user } = useAuth();
 
+  const { connected, state: boxState, actions } = usePawseBox();
+  const endedBoxRef = useRef(false);
+
   const [sessions, setSessions] = useState([]);
+
+  // If we land on this screen and the ESP32 is still in an active state,
+  // it means the user gave up / ended the session — tell the box to stop.
+  useEffect(() => {
+    if (
+      connected &&
+      !endedBoxRef.current &&
+      (boxState === "LOCKED" || boxState === "URGENT" || boxState === "RESUME")
+    ) {
+      endedBoxRef.current = true;
+      actions.endSession();
+    }
+  }, [connected, boxState, actions]);
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -114,8 +133,12 @@ const OverrideLogScreen = () => {
   }, [user?.id]);
 
   const overrideItems = buildOverrideLogItems(sessions);
-  const urgentAllowedCount = overrideItems.filter((i) => i.type === "override").length;
-  const manualUnlockCount = overrideItems.filter((i) => i.type === "unlock").length;
+  const urgentAllowedCount = overrideItems.filter(
+    (i) => i.type === "override",
+  ).length;
+  const manualUnlockCount = overrideItems.filter(
+    (i) => i.type === "unlock",
+  ).length;
 
   return (
     <View style={patterns.screen}>
@@ -139,7 +162,11 @@ const OverrideLogScreen = () => {
           onPress={() => navigation.goBack()}
           activeOpacity={0.75}
         >
-          <MaterialIcons name="chevron-left" size={22} color={colors.warmBrown} />
+          <MaterialIcons
+            name="chevron-left"
+            size={22}
+            color={colors.warmBrown}
+          />
           <Text style={styles.backText}>Back to Stats</Text>
         </TouchableOpacity>
 
@@ -147,18 +174,27 @@ const OverrideLogScreen = () => {
           <Text style={styles.eyebrow}>ACTIVITY HISTORY</Text>
           <Text style={styles.logTitle}>Override Log</Text>
           <Text style={styles.logSubtitle}>
-            Emergency unlocks and urgent notifications that passed through during focus sessions.
+            Emergency unlocks and urgent notifications that passed through
+            during focus sessions.
           </Text>
         </View>
 
         <View style={{ flexDirection: "row", gap: spacing.sm }}>
           <View style={[styles.summaryCard, shadows.card]}>
-            <MaterialIcons name="priority-high" size={22} color={colors.error} />
+            <MaterialIcons
+              name="priority-high"
+              size={22}
+              color={colors.error}
+            />
             <Text style={styles.summaryValue}>{urgentAllowedCount}</Text>
             <Text style={styles.summaryLabel}>Urgent Alerts</Text>
           </View>
           <View style={[styles.summaryCard, shadows.card]}>
-            <MaterialIcons name="settings-backup-restore" size={22} color={colors.error} />
+            <MaterialIcons
+              name="settings-backup-restore"
+              size={22}
+              color={colors.error}
+            />
             <Text style={styles.summaryValue}>{manualUnlockCount}</Text>
             <Text style={styles.summaryLabel}>Manual Unlocks</Text>
           </View>
@@ -167,7 +203,11 @@ const OverrideLogScreen = () => {
         <View style={{ gap: spacing.sm }}>
           {overrideItems.length === 0 ? (
             <View style={[patterns.card, shadows.card, styles.emptyCard]}>
-              <MaterialIcons name="verified-user" size={32} color={colors.success} />
+              <MaterialIcons
+                name="verified-user"
+                size={32}
+                color={colors.success}
+              />
               <Text style={styles.emptyTitle}>No overrides yet.</Text>
               <Text style={styles.emptyText}>
                 Emergency alerts and manual unlocks will appear here.
@@ -178,7 +218,11 @@ const OverrideLogScreen = () => {
               <View key={item.id} style={[patterns.card, shadows.card]}>
                 <View style={styles.logHeader}>
                   <View style={styles.warningIcon}>
-                    <MaterialIcons name={item.icon} size={18} color={colors.error} />
+                    <MaterialIcons
+                      name={item.icon}
+                      size={18}
+                      color={colors.error}
+                    />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.logItemTitle}>{item.title}</Text>
@@ -193,11 +237,19 @@ const OverrideLogScreen = () => {
 
                 <View style={styles.logFooter}>
                   <View style={styles.footerItem}>
-                    <MaterialIcons name="timer" size={13} color={colors.outline} />
+                    <MaterialIcons
+                      name="timer"
+                      size={13}
+                      color={colors.outline}
+                    />
                     <Text style={styles.footerText}>{item.duration}</Text>
                   </View>
                   <View style={styles.footerItem}>
-                    <MaterialIcons name="apps" size={13} color={colors.outline} />
+                    <MaterialIcons
+                      name="apps"
+                      size={13}
+                      color={colors.outline}
+                    />
                     <Text style={styles.footerText}>{item.source}</Text>
                   </View>
                 </View>

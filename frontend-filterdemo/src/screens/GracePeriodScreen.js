@@ -18,9 +18,16 @@ import { colors, spacing, radii, shadows, typography } from "../theme";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
 import { responsive } from "../utils/responsive";
+import { usePawseBox } from "../context/PawseBoxContext";
 import { fmt } from "./active-session/utils";
 
 const DEFAULT_GRACE_SECONDS = 10 * 60;
+
+const normalizeSeconds = (value, fallback = 0) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.floor(n));
+};
 
 const GracePeriodScreen = () => {
   const navigation = useNavigation();
@@ -31,12 +38,18 @@ const GracePeriodScreen = () => {
   const timerSize = r.timerSize;
   const timerFaceSize = Math.max(190, timerSize - 48);
   const { user } = useAuth();
+  const { connected, actions } = usePawseBox();
 
   const {
     durationMinutes = 45,
     remainingSeconds = durationMinutes * 60,
     sessionId,
   } = route.params ?? {};
+
+  const pausedFocusSeconds = normalizeSeconds(
+    remainingSeconds,
+    durationMinutes * 60,
+  );
 
   const [gracePeriodSecs, setGracePeriodSecs] = useState(DEFAULT_GRACE_SECONDS);
   const [graceRemaining, setGraceRemaining] = useState(DEFAULT_GRACE_SECONDS);
@@ -65,6 +78,11 @@ const GracePeriodScreen = () => {
     fetchGracePeriod();
   }, [user?.id]);
 
+  // FIX: Removed the redundant pause command that fired on mount.
+  // ActiveSessionScreen.goToGracePeriod() already sends pause:<seconds>
+  // before navigating here. Sending it again caused an unnecessary servo
+  // movement which corrupted the LCD display.
+
   useEffect(() => {
     const id = setInterval(
       () => setGraceRemaining((r) => (r > 0 ? r - 1 : 0)),
@@ -91,21 +109,34 @@ const GracePeriodScreen = () => {
     ).start();
   }, [pulseAnim]);
 
+  // FIX: Don't send resume:yes here. ActiveSessionScreen will send it
+  // when it mounts via its own useEffect (the isResumingFromGrace path).
+  // Previously both screens sent resume:yes, causing a double servo move
+  // and LCD corruption (the "weird characters" bug).
+  const resumeFocusTimer = () => {
+    navigation.replace("ActiveSession", {
+      durationMinutes,
+      initialRemainingSeconds: pausedFocusSeconds,
+      existingSessionId: sessionId,
+    });
+  };
+
   const continueSession = () => {
     if (hasLeftRef.current) return;
     hasLeftRef.current = true;
-
-    navigation.replace("ActiveSession", {
-      durationMinutes,
-      initialRemainingSeconds: remainingSeconds,
-      existingSessionId: sessionId,
-    });
+    resumeFocusTimer();
   };
 
   const giveUpForToday = async () => {
     if (hasLeftRef.current || isEnding) return;
     hasLeftRef.current = true;
     setIsEnding(true);
+
+    // FIX: endSession() now sends a single "end" command.
+    // The firmware handles unlocking + LCD reset internally.
+    if (connected) {
+      await actions.endSession();
+    }
 
     if (sessionId) {
       const { error } = await supabase
@@ -119,17 +150,12 @@ const GracePeriodScreen = () => {
     navigation.replace("HomeScreen");
   };
 
-  // If grace runs out, restart a fresh focus timer.
+  // If grace runs out, automatically continue the paused focus timer.
   useEffect(() => {
     if (graceRemaining > 0 || hasLeftRef.current) return;
     hasLeftRef.current = true;
-
-    navigation.replace("ActiveSession", {
-      durationMinutes,
-      initialRemainingSeconds: durationMinutes * 60,
-      existingSessionId: sessionId,
-    });
-  }, [graceRemaining, durationMinutes, navigation, sessionId]);
+    resumeFocusTimer();
+  }, [graceRemaining]);
 
   const graceProgress =
     gracePeriodSecs > 0 ? graceRemaining / gracePeriodSecs : 0;
@@ -197,7 +223,7 @@ const GracePeriodScreen = () => {
         <View style={styles.pausedBadge}>
           <MaterialIcons name="pause-circle" size={16} color={colors.outline} />
           <Text style={styles.pausedText}>
-            Focus paused at {fmt(remainingSeconds)}
+            Focus paused at {fmt(pausedFocusSeconds)}
           </Text>
         </View>
 

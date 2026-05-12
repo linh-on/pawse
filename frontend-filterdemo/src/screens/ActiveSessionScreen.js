@@ -1,9 +1,4 @@
-// ActiveSessionScreen.js — only the NotifPanel call and sim hook usage changed.
-// Everything else is identical to the original.
-//
-// Changes vs original:
-//   1. sim now returns mode, hasPermission, requestPermission
-//   2. NotifPanel receives those three new props
+// ActiveSessionScreen.js
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -21,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CircularProgress from "../components/CircularProgress";
 import Header from "../components/Header";
-import { usePawseBox } from "../hooks/usePawseBox";
+import { usePawseBox } from "../context/PawseBoxContext";
 import { colors, spacing, radii, shadows, typography } from "../theme";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
@@ -50,12 +45,21 @@ const ActiveSessionScreen = () => {
 
   const TOTAL_SECONDS = durationMinutes * 60;
 
-  const { connected, state: boxState, remaining: boxRemaining, actions } = usePawseBox();
+  const {
+    connected,
+    state: boxState,
+    remaining: boxRemaining,
+    actions,
+  } = usePawseBox();
 
   const [localRemaining, setLocalRemaining] = useState(
     typeof initialRemainingSeconds === "number"
       ? initialRemainingSeconds
       : TOTAL_SECONDS,
+  );
+
+  const isResumingFromGrace = Boolean(
+    existingSessionId && typeof initialRemainingSeconds === "number",
   );
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -119,6 +123,13 @@ const ActiveSessionScreen = () => {
   const finishDbSession = async (completed) => {
     if (!dbSessionIdRef.current || sessionFinishedRef.current) return;
     sessionFinishedRef.current = true;
+
+    // Tell the ESP32 to end the session when ending early.
+    // This should restore the LCD to "Phone Linked" instead of leaving time on-screen.
+    if (!completed && connected) {
+      await actions.endSession();
+    }
+
     const { error } = await supabase
       .from("sessions")
       .update({ ended_at: new Date().toISOString(), completed })
@@ -127,20 +138,30 @@ const ActiveSessionScreen = () => {
   };
 
   useEffect(() => {
-    if (connected && !sessionStartedRef.current) {
-      actions.startSession(Math.ceil(localRemaining / 60));
-      sessionStartedRef.current = true;
+    if (!connected || sessionStartedRef.current) return;
+
+    const seconds = Math.max(0, Math.floor(localRemaining));
+
+    if (isResumingFromGrace) {
+      // Resume the ESP32 from the exact paused app time.
+      actions.resume(true, seconds);
+    } else {
+      // New sessions still use the original minute-based ESP32 start command.
+      actions.startSession(Math.ceil(seconds / 60));
     }
-  }, [connected, localRemaining]);
+
+    sessionStartedRef.current = true;
+  }, [connected, localRemaining, isResumingFromGrace, actions]);
 
   useEffect(() => {
-    if (connected) return;
+    // Keep the app timer running even when BLE is connected.
+    // The app timer is the fallback source of truth if ESP32 notifications are stale.
     const id = setInterval(
       () => setLocalRemaining((r) => (r > 0 ? r - 1 : 0)),
       1000,
     );
     return () => clearInterval(id);
-  }, [connected]);
+  }, []);
 
   useEffect(() => {
     Animated.loop(
@@ -159,10 +180,20 @@ const ActiveSessionScreen = () => {
     ).start();
   }, [pulseAnim]);
 
-  const remainingSecs = connected ? parseTime(boxRemaining) : localRemaining;
+  // Only use box values once ESP32 is in an active state (not initial "00:00")
+  const boxIsActive =
+    connected &&
+    (boxState === "LOCKED" ||
+      boxState === "URGENT" ||
+      boxState === "RESUME" ||
+      boxState === "DONE");
+  const boxRemainingSecs = boxIsActive ? parseTime(boxRemaining) : null;
+  const remainingSecs =
+    typeof boxRemainingSecs === "number" && boxRemainingSecs > 0
+      ? Math.min(localRemaining, boxRemainingSecs)
+      : localRemaining;
 
-  // Auto-dismiss the urgent modal when the hardware resolves it (user pressed
-  // Yes/No on the physical buttons). The box state leaves "URGENT" → "LOCKED".
+  // Auto-dismiss the urgent modal when the hardware resolves it
   const prevBoxState = useRef(boxState);
   useEffect(() => {
     if (
@@ -175,23 +206,34 @@ const ActiveSessionScreen = () => {
     }
     prevBoxState.current = boxState;
   }, [boxState, connected, sim]);
-  const displayTime = connected ? boxRemaining : fmt(localRemaining);
+
+  const displayTime = fmt(remainingSecs);
   const progress = TOTAL_SECONDS > 0 ? remainingSecs / TOTAL_SECONDS : 0;
 
+  // Only navigate home when the session actually finished
   useEffect(() => {
-    if (remainingSecs <= 0 && !hasNavigatedRef.current) {
+    const localTimerDone = remainingSecs <= 0;
+    const boxTimerDone = connected && boxState === "DONE";
+
+    if ((localTimerDone || boxTimerDone) && !hasNavigatedRef.current) {
       hasNavigatedRef.current = true;
       sim.clearModal();
       finishDbSession(true).then(() => navigation.replace("HomeScreen"));
     }
-  }, [remainingSecs, sim, navigation]);
+  }, [remainingSecs, boxState, connected, sim, navigation]);
 
-  function goToGracePeriod() {
-    if (connected) actions.respondUrgent(true);
+  async function goToGracePeriod() {
+    const pausedSeconds = Math.max(0, Math.floor(remainingSecs));
+
+    if (connected) {
+      // Freeze the ESP32 timer at the same value the app passes to GracePeriod.
+      await actions.pauseSession(pausedSeconds);
+    }
+
     sim.clearModal();
     navigation.replace("GracePeriod", {
       durationMinutes,
-      remainingSeconds: remainingSecs,
+      remainingSeconds: pausedSeconds,
       sessionId: dbSessionIdRef.current,
     });
   }
@@ -254,7 +296,11 @@ const ActiveSessionScreen = () => {
               style={[
                 styles.timerFace,
                 shadows.timer,
-                { width: timerFaceSize, height: timerFaceSize, borderRadius: timerFaceSize / 2 },
+                {
+                  width: timerFaceSize,
+                  height: timerFaceSize,
+                  borderRadius: timerFaceSize / 2,
+                },
               ]}
             >
               <MaterialIcons
@@ -269,7 +315,6 @@ const ActiveSessionScreen = () => {
           </CircularProgress>
         </Animated.View>
 
-        {/* ── Updated NotifPanel call — passes mode + permission props ── */}
         <NotifPanel
           feed={sim.feed}
           isRunning={sim.isRunning}

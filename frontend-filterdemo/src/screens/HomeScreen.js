@@ -137,7 +137,6 @@ const HomeScreen = () => {
     setLoadingStats(false);
   }, [user?.id]);
 
-  // Re-fetch stats every time the screen is focused (including returning from ActiveSession)
   useFocusEffect(
     useCallback(() => {
       fetchHomeStats();
@@ -255,7 +254,9 @@ const HomeScreen = () => {
               size={22}
               color={colors.primaryContainer}
             />
-            <Text style={styles.statLabel} numberOfLines={1}>TODAY</Text>
+            <Text style={styles.statLabel} numberOfLines={1}>
+              TODAY
+            </Text>
             <Text style={styles.statValue}>
               {loadingStats ? "..." : formatMinutes(todayMinutes)}
             </Text>
@@ -266,7 +267,9 @@ const HomeScreen = () => {
               size={22}
               color={colors.secondary}
             />
-            <Text style={styles.statLabel} numberOfLines={1}>STREAK</Text>
+            <Text style={styles.statLabel} numberOfLines={1}>
+              STREAK
+            </Text>
             <Text style={styles.statValue}>
               {loadingStats ? "..." : `${streak} days`}
             </Text>
@@ -390,10 +393,7 @@ const HomeScreen = () => {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surfaceContainerLow },
-  scroll: {
-    paddingTop: spacing.md,
-    gap: spacing.gutter,
-  },
+  scroll: { paddingTop: spacing.md, gap: spacing.gutter },
   hero: { alignItems: "center", gap: spacing.sm },
   greeting: {
     ...typography.h1,

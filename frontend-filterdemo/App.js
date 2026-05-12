@@ -12,6 +12,7 @@ import {
 } from "@expo-google-fonts/dm-sans";
 import { PlusJakartaSans_800ExtraBold } from "@expo-google-fonts/plus-jakarta-sans";
 import { colors } from "./src/theme";
+import { PawseBoxProvider } from "./src/context/PawseBoxContext";
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -41,7 +42,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppNavigator />
+        <PawseBoxProvider>
+          <AppNavigator />
+        </PawseBoxProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

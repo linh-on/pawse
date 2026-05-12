@@ -6,18 +6,30 @@ import {
   Image,
   StyleSheet,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { colors, spacing, radii, typography } from "../theme";
 import { useAuth } from "../lib/AuthContext";
+import { usePawseBox } from "../context/PawseBoxContext";
 
 const Header = ({ title = "Pawse", showProfile = true, badge = null }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { user } = useAuth();
   const avatarUrl = user?.avatar_url ?? null;
+  const { connected, scanning, connect, disconnect } = usePawseBox();
+
+  const handleBleTap = () => {
+    if (scanning) return;
+    if (connected) {
+      disconnect();
+    } else {
+      connect();
+    }
+  };
 
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top + 8 }]}>
@@ -36,15 +48,31 @@ const Header = ({ title = "Pawse", showProfile = true, badge = null }) => {
             <MaterialIcons name="lock" size={14} color={colors.tertiary} />
             <Text style={styles.badgeText}>{badge}</Text>
           </View>
-        ) : (
-          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+        ) : null}
+
+        {/* ── BLE Button ── */}
+        <TouchableOpacity
+          style={[styles.bleBtn, connected && styles.bleBtnConnected]}
+          onPress={handleBleTap}
+          activeOpacity={0.7}
+          disabled={scanning}
+        >
+          {scanning ? (
+            <ActivityIndicator size={14} color={colors.primary} />
+          ) : (
             <MaterialIcons
-              name="bluetooth-connected"
-              size={22}
-              color={colors.primaryContainer}
+              name={connected ? "bluetooth-connected" : "bluetooth"}
+              size={18}
+              color={connected ? "#fff" : colors.primaryContainer}
             />
-          </TouchableOpacity>
-        )}
+          )}
+          <Text
+            style={[styles.bleBtnText, connected && styles.bleBtnTextConnected]}
+          >
+            {scanning ? "Scanning..." : connected ? "Connected" : "Connect"}
+          </Text>
+        </TouchableOpacity>
+
         {showProfile && !badge && (
           <TouchableOpacity
             style={styles.avatarRing}
@@ -79,7 +107,6 @@ const styles = StyleSheet.create({
   left: { flexDirection: "row", alignItems: "center", gap: 10 },
   wordmark: { ...typography.h3, color: colors.orange, letterSpacing: -0.5 },
   right: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  iconBtn: { padding: 8, borderRadius: radii.full },
   avatarRing: {
     width: 34,
     height: 34,
@@ -109,6 +136,32 @@ const styles = StyleSheet.create({
     ...typography.labelCaps,
     color: colors.onSurfaceVariant,
     fontSize: 10,
+  },
+
+  // ── BLE Button ──
+  bleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    backgroundColor: `${colors.primary}10`,
+    borderWidth: 1,
+    borderColor: `${colors.primary}25`,
+  },
+  bleBtnConnected: {
+    backgroundColor: "#1F8A3F",
+    borderColor: "#1F8A3F",
+  },
+  bleBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primaryContainer,
+    letterSpacing: 0.2,
+  },
+  bleBtnTextConnected: {
+    color: "#fff",
   },
 });
 
