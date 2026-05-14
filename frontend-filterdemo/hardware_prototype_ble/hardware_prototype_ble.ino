@@ -55,7 +55,7 @@ bool deviceConnected = false;
 // BLE onWrite runs in the BLE task, but LCD/servo must only be
 // touched from loop() (main task). Buffer one command at a time
 // using a plain char array — no String heap ops across tasks.
-#define CMD_BUF_SIZE 64
+#define CMD_BUF_SIZE 128
 volatile bool cmdPending = false;
 char cmdBuffer[CMD_BUF_SIZE];
 
@@ -151,7 +151,15 @@ void refreshCountdown() {
   lcdShow("Focus Session", formatTime(rem) + " LOCKED");
 }
 
-// ── Build the status JSON (same format as old /status) ───
+// ── Build the status JSON ─────────────────────────────────
+// FIX (v6): Dropped the always-empty "u":"" field.
+// Old format: {"s":"L","r":"30:47","u":""} = 28 bytes
+// New format: {"s":"L","r":"30:47"}        = 21 bytes
+//
+// With a default BLE MTU of 23 (20 bytes of ATT payload), the old 28-byte
+// JSON was truncated to 20 bytes with no closing '}', which silently blocked
+// all state updates on the phone. At 21 bytes the truncation is only 1 byte
+// and the regex fallback in parseStatus (usePawseBox.js v6) recovers it.
 String buildStatusJson() {
   long rem = 0;
   if (state == LOCKED || state == URGENT)
@@ -169,16 +177,11 @@ String buildStatusJson() {
     default:     s = 'D'; break;
   }
 
-  // Short keys: {"s":"L","r":"30:47","u":""}
-  // The "u" field is always empty now — the app receives urgent text
-  // via the sendUrgent command, not from status polling. Keeping the
-  // key present for backward compat but empty so the JSON stays
-  // under ~30 bytes and never hits MTU limits.
   String json = "{\"s\":\"";
   json += s;
   json += "\",\"r\":\"";
   json += formatTime(rem);
-  json += "\",\"u\":\"\"}";
+  json += "\"}";
   return json;
 }
 
@@ -191,6 +194,18 @@ void notifyStatus() {
   String json = buildStatusJson();
   pStatusChar->setValue(json.c_str());
   pStatusChar->notify();
+}
+
+// ── Strip non-printable / non-ASCII chars before writing to LCD ──
+// Prevents emojis and special phone characters from showing as garbage.
+String cleanLCDText(String text) {
+  String output = "";
+  for (int i = 0; i < text.length(); i++) {
+    char c = text.charAt(i);
+    if (c >= 32 && c <= 126) output += c;
+  }
+  output.trim();
+  return output;
 }
 
 // ── Command handler (replaces HTTP handlers) ─────────────
@@ -216,7 +231,8 @@ void handleCommand(const String& raw) {
     }
   }
   else if (verb == "urgent" && state == LOCKED) {
-    urgentMsg = payload.substring(0, 20);  // ← cap here
+    payload = cleanLCDText(payload);
+    urgentMsg = payload.substring(0, 80);  // longer than 16 so LCD line 2 can scroll
     state = URGENT;
     startScroll(urgentMsg);
   }
@@ -264,7 +280,7 @@ void handleCommand(const String& raw) {
     stopScroll();
     state = DONE;
     urgentMsg = "";
-    setLock(true);                               // unlock the box
+    setLock(true);
     lcd.begin(16, 2);
     lcdShow("  Session End ", "  Good work!  ");
   }
@@ -274,7 +290,7 @@ void handleCommand(const String& raw) {
       ? (unsigned long)secs * 1000UL
       : ((sessionEnd > millis()) ? (sessionEnd - millis()) : 0);
     urgentMsg = "";
-    setLock(true);                            // unlock the box
+    setLock(true);
     state = RESUME;
     String remStr = formatTime(resumeRemaining / 1000);
     lcd.begin(16, 2);
@@ -339,7 +355,7 @@ void setup() {
     BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
   );
   pStatusChar->addDescriptor(new BLE2902());  // required for notifications
-  pStatusChar->setValue("{\"state\":\"IDLE\",\"remaining\":\"00:00\",\"urgentMsg\":\"\"}");
+  pStatusChar->setValue("{\"s\":\"I\",\"r\":\"00:00\"}");
 
   // COMMAND — write
   pCommandChar = pService->createCharacteristic(

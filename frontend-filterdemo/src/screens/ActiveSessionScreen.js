@@ -26,6 +26,24 @@ import { useNotifSimulator } from "./active-session/useNotifSimulator";
 import NotifPanel from "./active-session/NotifPanel";
 import UrgentModal from "./active-session/UrgentModal";
 
+const cleanLCDText = (text = "") => {
+  return String(text)
+    .replace(/[^\x20-\x7E]/g, "") // remove emojis / special LCD-breaking chars
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const makeLCDUrgentText = (entry) => {
+  // Later, when you add real AI, put the AI result in entry.aiSummary.
+  // For now, this still works with the current notification text.
+  const raw =
+    entry?.aiSummary || entry?.summary || entry?.text || "Urgent message";
+
+  // Send more than 16 characters so the ESP32 LCD can scroll it,
+  // but keep it short enough to avoid BLE/message-size problems.
+  return cleanLCDText(raw).slice(0, 80);
+};
+
 const ActiveSessionScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -86,7 +104,9 @@ const ActiveSessionScreen = () => {
   const sim = useNotifSimulator({
     onNotificationClassified: saveNotificationLog,
     onUrgentDetected: (entry) => {
-      if (connected) actions.sendUrgent(entry.text.slice(0, 16));
+      if (connected) {
+        actions.sendUrgent(makeLCDUrgentText(entry));
+      }
     },
     onUrgentDismiss: () => {
       if (connected) actions.respondUrgent(false);
@@ -213,7 +233,11 @@ const ActiveSessionScreen = () => {
   // Auto-dismiss urgent modal when hardware resolves it via physical buttons
   const prevBoxState = useRef(boxState);
   useEffect(() => {
-    if (connected && prevBoxState.current === "URGENT" && boxState !== "URGENT") {
+    if (
+      connected &&
+      prevBoxState.current === "URGENT" &&
+      boxState !== "URGENT"
+    ) {
       if (boxState === "RESUME") {
         // Physical YES pressed on box — dismiss modal and go to grace period
         sim.dismissModal();
@@ -297,8 +321,8 @@ const ActiveSessionScreen = () => {
                 color={colors.error}
               />
               <Text style={styles.noBoxText}>
-                Box wasn't connected at start — connect before your next
-                session for full sync.
+                Box wasn't connected at start — connect before your next session
+                for full sync.
               </Text>
             </View>
           )}

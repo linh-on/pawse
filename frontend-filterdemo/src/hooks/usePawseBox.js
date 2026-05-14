@@ -1,15 +1,13 @@
 /**
  * usePawseBox.js — BLE version (manual connect/disconnect)
  *
- * v5 fixes:
- *   - Explicit requestMTU(185) after connection — more reliable than the
- *     connect() option on many Android devices (especially Samsung).
- *   - parseStatus handles both short-key (s/r/u) and old long-key
- *     (state/remaining/urgentMsg) JSON from the ESP32.
- *   - Silences parse errors for truncated JSON instead of spamming console.
- *   - onDisconnected resets scanning state to prevent "stuck on Scanning..." in Header.
- *   - endSession sends a single "end" command.
- *   - disconnect no longer sends lcd:waiting (firmware handles it in onDisconnect).
+ * v6 fixes:
+ *   - parseStatus no longer early-returns when the closing '}' is missing.
+ *     With a 20-byte ATT payload the 21-byte JSON {"s":"L","r":"30:47"}
+ *     is truncated to {"s":"L","r":"30:47" (no '}'), which previously hit
+ *     the `lastBrace === -1` guard and returned before the regex fallback
+ *     could run — so boxState NEVER updated and no sync effect ever fired.
+ *     Now the regex fallback always gets a chance to extract state + remaining.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -127,9 +125,16 @@ export function usePawseBox() {
   const parseFailCount = useRef(0);
 
   // ── Parse status from ESP32 ───────────────────────────
-  // Accepts both short-key (v5) and long-key (v3/v4) JSON:
-  //   Short: {"s":"L","r":"30:47","u":""}
+  // Accepts both short-key (v6) and old long-key (v3/v4) JSON:
+  //   Short: {"s":"L","r":"30:47"}
   //   Long:  {"state":"LOCKED","remaining":"30:47","urgentMsg":""}
+  //
+  // FIX (v6): When the BLE ATT payload is 20 bytes (MTU=23 minus 3 overhead)
+  // the 21-byte JSON {"s":"L","r":"30:47"} is delivered truncated as
+  // {"s":"L","r":"30:47" (no closing '}'). Previously we returned early when
+  // lastBrace === -1, so the regex fallback never ran and boxState froze.
+  // Now we skip the early return and let JSON.parse throw, which falls
+  // through to the regex path that can still extract "s" and "r" correctly.
   const parseStatus = useCallback((b64Value) => {
     let json;
     try {
@@ -138,19 +143,33 @@ export function usePawseBox() {
       return; // bad base64, skip silently
     }
 
-    // ESP32 characteristics often use a fixed-size buffer padded with 0xFF
-    // or other non-printable bytes. Strip everything after the last '}' so
-    // JSON.parse doesn't choke on the trailing garbage.
+    // Trim trailing garbage (0xFF padding etc.) by finding last '}'.
+    // If no '}' is present (truncated by MTU), keep the raw string so the
+    // regex fallback below can still extract state + remaining.
     const lastBrace = json.lastIndexOf("}");
-    if (lastBrace === -1) return; // no valid JSON object at all
-    json = json.substring(0, lastBrace + 1);
+    if (lastBrace !== -1) {
+      json = json.substring(0, lastBrace + 1);
+    }
+    // Do NOT return early here — fall through to JSON.parse which will throw
+    // on a truncated string, then the catch block runs the regex fallback.
 
     let data;
     try {
+      if (lastBrace === -1) throw new Error("no closing brace");
       data = JSON.parse(json);
     } catch (e) {
-      // JSON was truncated (MTU issue). Log once every 10 failures
-      // instead of flooding the console.
+      // JSON was truncated (MTU issue). Try to extract state + remaining
+      // with regex so boxState still updates — this is critical for sync
+      // between the physical buttons and the phone UI.
+      const stateMatch = json.match(/"s"\s*:\s*"([A-Z])"/);
+      if (stateMatch) {
+        setState(STATE_MAP[stateMatch[1]] ?? stateMatch[1]);
+        const remMatch = json.match(/"r"\s*:\s*"(\d+:\d+)"/);
+        if (remMatch) setRemaining(remMatch[1]);
+        parseFailCount.current = 0;
+        return;
+      }
+
       parseFailCount.current += 1;
       if (parseFailCount.current === 1 || parseFailCount.current % 10 === 0) {
         console.warn(
@@ -164,7 +183,7 @@ export function usePawseBox() {
     // Successfully parsed — reset failure counter
     parseFailCount.current = 0;
 
-    // Handle short keys (v5 firmware)
+    // Handle short keys (v5/v6 firmware)
     if (data.s !== undefined) {
       setState(STATE_MAP[data.s] ?? data.s);
       setRemaining(data.r ?? "00:00");
@@ -253,7 +272,7 @@ export function usePawseBox() {
             return;
           }
 
-          // FIX: Explicit MTU negotiation. The connect({ requestMTU }) option
+          // Explicit MTU negotiation. The connect({ requestMTU }) option
           // silently fails on many Android phones (especially Samsung Galaxy).
           // Calling requestMTU() directly is more reliable and lets us await
           // the actual negotiated value.
@@ -266,8 +285,8 @@ export function usePawseBox() {
                 "MTU negotiation failed, using default:",
                 mtuErr.message,
               );
-              // Continue anyway — the firmware now uses short-key JSON that
-              // fits within smaller MTUs.
+              // Continue anyway — parseStatus now handles truncated JSON via
+              // regex fallback even when MTU stays at the 23-byte default.
             }
           }
 
@@ -311,7 +330,7 @@ export function usePawseBox() {
           d.onDisconnected(() => {
             console.log("BLE disconnected");
             setConnected(false);
-            setScanning(false); // FIX: reset scanning in case it was stuck
+            setScanning(false);
             setState(null);
             setRemaining("00:00");
             setUrgentMsg("");
@@ -327,9 +346,6 @@ export function usePawseBox() {
       }
     });
 
-    // FIX: Always reset scanning after timeout, regardless of cancelledRef.
-    // The old version checked !cancelledRef which could leave scanning stuck
-    // if disconnect() was called during the scan window.
     setTimeout(() => {
       if (!deviceRef.current) {
         ble.stopDeviceScan();

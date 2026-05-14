@@ -57,24 +57,23 @@ const GracePeriodScreen = () => {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const hasLeftRef = useRef(false);
-  const prevBoxState = useRef(boxState);
 
   // ── Sync physical buttons with phone UI ──────────────
-  // When the user presses YES/NO on the box while this screen is showing,
-  // the ESP32 transitions out of RESUME. Mirror that on the phone.
-  useEffect(() => {
-    if (!connected) {
-      prevBoxState.current = boxState;
-      return;
-    }
+  // Separate ref so this effect can NEVER block the manual buttons.
+  const prevBoxState = useRef(boxState);
+  const syncedRef = useRef(false);
 
-    const wasResume = prevBoxState.current === "RESUME";
+  useEffect(() => {
+    const prev = prevBoxState.current;
     prevBoxState.current = boxState;
 
-    if (!wasResume || hasLeftRef.current) return;
+    // Only act on genuine RESUME → something-else transitions
+    if (!connected || syncedRef.current || hasLeftRef.current) return;
+    if (prev !== "RESUME" || boxState === "RESUME" || boxState === prev) return;
 
     if (boxState === "LOCKED") {
-      // Physical YES — user wants to continue the session
+      // Physical YES on box — continue session
+      syncedRef.current = true;
       hasLeftRef.current = true;
       navigation.replace("ActiveSession", {
         durationMinutes,
@@ -82,7 +81,8 @@ const GracePeriodScreen = () => {
         existingSessionId: sessionId,
       });
     } else if (boxState === "DONE") {
-      // Physical NO — user wants to end the session
+      // Physical NO on box — end session
+      syncedRef.current = true;
       hasLeftRef.current = true;
       if (sessionId) {
         supabase
@@ -95,14 +95,7 @@ const GracePeriodScreen = () => {
       }
       navigation.replace("HomeScreen");
     }
-  }, [
-    boxState,
-    connected,
-    navigation,
-    durationMinutes,
-    pausedFocusSeconds,
-    sessionId,
-  ]);
+  }, [boxState]); // Only re-run when boxState changes — not on every render
 
   useEffect(() => {
     async function fetchGracePeriod() {

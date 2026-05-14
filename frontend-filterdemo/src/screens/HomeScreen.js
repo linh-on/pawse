@@ -588,7 +588,7 @@ const HomeScreen = () => {
 
             <Text style={styles.overlayTitle}>Put your phone in the box</Text>
             <Text style={styles.overlaySubtitle}>
-              Your session will begin when the timer ends
+              Your session will begin in
             </Text>
 
             <Animated.Text
