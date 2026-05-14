@@ -196,16 +196,21 @@ const ActiveSessionScreen = () => {
   // Auto-dismiss the urgent modal when the hardware resolves it
   const prevBoxState = useRef(boxState);
   useEffect(() => {
-    if (
-      connected &&
-      prevBoxState.current === "URGENT" &&
-      boxState !== "URGENT" &&
-      sim.urgentModal
-    ) {
+  if (connected && prevBoxState.current === "URGENT" && boxState !== "URGENT") {
+    if (boxState === "RESUME") {
+      // Physical YES pressed on box — dismiss modal and go to grace period
+      sim.dismissModal();
+      if (!hasNavigatedRef.current) {
+        hasNavigatedRef.current = true;
+        goToGracePeriod();
+      }
+    } else if (boxState === "LOCKED") {
+      // Physical NO pressed on box — just dismiss the modal
       sim.dismissModal();
     }
-    prevBoxState.current = boxState;
-  }, [boxState, connected, sim]);
+  }
+  prevBoxState.current = boxState;
+}, [boxState, connected, sim, goToGracePeriod]);
 
   const displayTime = fmt(remainingSecs);
   const progress = TOTAL_SECONDS > 0 ? remainingSecs / TOTAL_SECONDS : 0;
@@ -222,21 +227,34 @@ const ActiveSessionScreen = () => {
     }
   }, [remainingSecs, boxState, connected, sim, navigation]);
 
-  async function goToGracePeriod() {
-    const pausedSeconds = Math.max(0, Math.floor(remainingSecs));
+  // async function goToGracePeriod() {
+  //   const pausedSeconds = Math.max(0, Math.floor(remainingSecs));
 
-    if (connected) {
-      // Freeze the ESP32 timer at the same value the app passes to GracePeriod.
-      await actions.pauseSession(pausedSeconds);
-    }
+  //   if (connected) {
+  //     // Freeze the ESP32 timer at the same value the app passes to GracePeriod.
+  //     await actions.pauseSession(pausedSeconds);
+  //   }
 
-    sim.clearModal();
-    navigation.replace("GracePeriod", {
-      durationMinutes,
-      remainingSeconds: pausedSeconds,
-      sessionId: dbSessionIdRef.current,
-    });
+  //   sim.clearModal();
+  //   navigation.replace("GracePeriod", {
+  //     durationMinutes,
+  //     remainingSeconds: pausedSeconds,
+  //     sessionId: dbSessionIdRef.current,
+  //   });
+  // }
+
+  const goToGracePeriod = useCallback(async () => {
+  const pausedSeconds = Math.max(0, Math.floor(remainingSecs));
+  if (connected) {
+    await actions.pauseSession(pausedSeconds);
   }
+  sim.clearModal();
+  navigation.replace("GracePeriod", {
+    durationMinutes,
+    remainingSeconds: pausedSeconds,
+    sessionId: dbSessionIdRef.current,
+  });
+}, [connected, remainingSecs, actions, sim, navigation, durationMinutes]);
 
   return (
     <View style={styles.screen}>
