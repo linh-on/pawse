@@ -145,17 +145,26 @@ String buildStatusJson() {
   else if (state == RESUME)
     rem = (long)(resumeRemaining / 1000);
 
-  String s;
+  // Single-char state codes match STATE_MAP in usePawseBox.js
+  char s;
   switch (state) {
-    case IDLE:    s = "IDLE";    break;
-    case LOCKED:  s = "LOCKED";  break;
-    case URGENT:  s = "URGENT";  break;
-    case RESUME:  s = "RESUME";  break;
-    default:      s = "DONE";    break;
+    case IDLE:   s = 'I'; break;
+    case LOCKED: s = 'L'; break;
+    case URGENT: s = 'U'; break;
+    case RESUME: s = 'R'; break;
+    default:     s = 'D'; break;
   }
-  return "{\"state\":\"" + s +
-         "\",\"remaining\":\"" + formatTime(rem) +
-         "\",\"urgentMsg\":\"" + urgentMsg + "\"}";
+
+  // Short keys: {"s":"L","r":"30:47","u":""}
+  // Max length ~40 bytes — fits comfortably in default MTU
+  String json = "{\"s\":\"";
+  json += s;
+  json += "\",\"r\":\"";
+  json += formatTime(rem);
+  json += "\",\"u\":\"";
+  json += urgentMsg;
+  json += "\"}";
+  return json;
 }
 
 // ── Notify the phone of the current status ───────────────
@@ -191,7 +200,7 @@ void handleCommand(const String& raw) {
     }
   }
   else if (verb == "urgent" && state == LOCKED) {
-    urgentMsg = payload;
+    urgentMsg = payload.substring(0, 20);  // ← cap here
     state = URGENT;
     startScroll(urgentMsg);
   }
