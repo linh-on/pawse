@@ -196,6 +196,7 @@ void handleCommand(const String& raw) {
       state = LOCKED;
       setLock(false);
       urgentMsg = "";
+      lcd.begin(16, 2);
       refreshCountdown();
     }
   }

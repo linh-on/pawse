@@ -1,6 +1,5 @@
 // ActiveSessionScreen.js
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -68,6 +67,11 @@ const ActiveSessionScreen = () => {
   const sessionFinishedRef = useRef(false);
   const hasNavigatedRef = useRef(false);
 
+  // Track whether the session started before the box was connected.
+  // If true, we skip sending start/resume when the box connects late
+  // to avoid LCD scramble and timer desync.
+  const sessionStartedWithoutBoxRef = useRef(!connected);
+
   const saveNotificationLog = async (entry) => {
     if (!dbSessionIdRef.current) return;
     const { error } = await supabase.from("notification_logs").insert({
@@ -124,8 +128,6 @@ const ActiveSessionScreen = () => {
     if (!dbSessionIdRef.current || sessionFinishedRef.current) return;
     sessionFinishedRef.current = true;
 
-    // Tell the ESP32 to end the session when ending early.
-    // This should restore the LCD to "Phone Linked" instead of leaving time on-screen.
     if (!completed && connected) {
       await actions.endSession();
     }
@@ -140,22 +142,24 @@ const ActiveSessionScreen = () => {
   useEffect(() => {
     if (!connected || sessionStartedRef.current) return;
 
-    const seconds = Math.max(0, Math.floor(localRemaining));
-
-    if (isResumingFromGrace) {
-      // Resume the ESP32 from the exact paused app time.
-      actions.resume(true, seconds);
-    } else {
-      // New sessions still use the original minute-based ESP32 start command.
-      actions.startSession(Math.ceil(seconds / 60));
+    // Box connected after the session timer was already running on the app.
+    // Don't send start — it causes LCD scramble and timer desync.
+    // Mark as started so this effect doesn't fire again, but take no action.
+    if (sessionStartedWithoutBoxRef.current) {
+      sessionStartedRef.current = true;
+      return;
     }
 
+    const seconds = Math.max(0, Math.floor(localRemaining));
+    if (isResumingFromGrace) {
+      actions.resume(true, seconds);
+    } else {
+      actions.startSession(Math.ceil(seconds / 60));
+    }
     sessionStartedRef.current = true;
   }, [connected, localRemaining, isResumingFromGrace, actions]);
 
   useEffect(() => {
-    // Keep the app timer running even when BLE is connected.
-    // The app timer is the fallback source of truth if ESP32 notifications are stale.
     const id = setInterval(
       () => setLocalRemaining((r) => (r > 0 ? r - 1 : 0)),
       1000,
@@ -180,7 +184,6 @@ const ActiveSessionScreen = () => {
     ).start();
   }, [pulseAnim]);
 
-  // Only use box values once ESP32 is in an active state (not initial "00:00")
   const boxIsActive =
     connected &&
     (boxState === "LOCKED" ||
@@ -193,29 +196,42 @@ const ActiveSessionScreen = () => {
       ? Math.min(localRemaining, boxRemainingSecs)
       : localRemaining;
 
-  // Auto-dismiss the urgent modal when the hardware resolves it
+  // Define goToGracePeriod before the prevBoxState effect that references it
+  const goToGracePeriod = useCallback(async () => {
+    const pausedSeconds = Math.max(0, Math.floor(remainingSecs));
+    if (connected) {
+      await actions.pauseSession(pausedSeconds);
+    }
+    sim.clearModal();
+    navigation.replace("GracePeriod", {
+      durationMinutes,
+      remainingSeconds: pausedSeconds,
+      sessionId: dbSessionIdRef.current,
+    });
+  }, [connected, remainingSecs, actions, sim, navigation, durationMinutes]);
+
+  // Auto-dismiss urgent modal when hardware resolves it via physical buttons
   const prevBoxState = useRef(boxState);
   useEffect(() => {
-  if (connected && prevBoxState.current === "URGENT" && boxState !== "URGENT") {
-    if (boxState === "RESUME") {
-      // Physical YES pressed on box — dismiss modal and go to grace period
-      sim.dismissModal();
-      if (!hasNavigatedRef.current) {
-        hasNavigatedRef.current = true;
-        goToGracePeriod();
+    if (connected && prevBoxState.current === "URGENT" && boxState !== "URGENT") {
+      if (boxState === "RESUME") {
+        // Physical YES pressed on box — dismiss modal and go to grace period
+        sim.dismissModal();
+        if (!hasNavigatedRef.current) {
+          hasNavigatedRef.current = true;
+          goToGracePeriod();
+        }
+      } else if (boxState === "LOCKED") {
+        // Physical NO pressed on box — just dismiss the modal
+        sim.dismissModal();
       }
-    } else if (boxState === "LOCKED") {
-      // Physical NO pressed on box — just dismiss the modal
-      sim.dismissModal();
     }
-  }
-  prevBoxState.current = boxState;
-}, [boxState, connected, sim, goToGracePeriod]);
+    prevBoxState.current = boxState;
+  }, [boxState, connected, sim, goToGracePeriod]);
 
   const displayTime = fmt(remainingSecs);
   const progress = TOTAL_SECONDS > 0 ? remainingSecs / TOTAL_SECONDS : 0;
 
-  // Only navigate home when the session actually finished
   useEffect(() => {
     const localTimerDone = remainingSecs <= 0;
     const boxTimerDone = connected && boxState === "DONE";
@@ -226,35 +242,6 @@ const ActiveSessionScreen = () => {
       finishDbSession(true).then(() => navigation.replace("HomeScreen"));
     }
   }, [remainingSecs, boxState, connected, sim, navigation]);
-
-  // async function goToGracePeriod() {
-  //   const pausedSeconds = Math.max(0, Math.floor(remainingSecs));
-
-  //   if (connected) {
-  //     // Freeze the ESP32 timer at the same value the app passes to GracePeriod.
-  //     await actions.pauseSession(pausedSeconds);
-  //   }
-
-  //   sim.clearModal();
-  //   navigation.replace("GracePeriod", {
-  //     durationMinutes,
-  //     remainingSeconds: pausedSeconds,
-  //     sessionId: dbSessionIdRef.current,
-  //   });
-  // }
-
-  const goToGracePeriod = useCallback(async () => {
-  const pausedSeconds = Math.max(0, Math.floor(remainingSecs));
-  if (connected) {
-    await actions.pauseSession(pausedSeconds);
-  }
-  sim.clearModal();
-  navigation.replace("GracePeriod", {
-    durationMinutes,
-    remainingSeconds: pausedSeconds,
-    sessionId: dbSessionIdRef.current,
-  });
-}, [connected, remainingSecs, actions, sim, navigation, durationMinutes]);
 
   return (
     <View style={styles.screen}>
@@ -278,6 +265,8 @@ const ActiveSessionScreen = () => {
           <Text style={styles.subtitle}>
             Your phone is tucked away for a while.
           </Text>
+
+          {/* Box connection status indicator */}
           <View style={styles.boxIndicator}>
             <View
               style={[
@@ -298,6 +287,21 @@ const ActiveSessionScreen = () => {
               {connected ? "Box connected" : "Box offline"}
             </Text>
           </View>
+
+          {/* Warning banner: session started without box */}
+          {sessionStartedWithoutBoxRef.current && !connected && (
+            <View style={styles.noBoxBanner}>
+              <MaterialIcons
+                name="bluetooth-disabled"
+                size={16}
+                color={colors.error}
+              />
+              <Text style={styles.noBoxText}>
+                Box wasn't connected at start — connect before your next
+                session for full sync.
+              </Text>
+            </View>
+          )}
         </View>
 
         <Animated.View
@@ -375,7 +379,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     gap: spacing.lg,
   },
-  titleBlock: { alignItems: "center", gap: 6 },
+  titleBlock: { alignItems: "center", gap: 6, width: "100%" },
   title: { ...typography.h2, color: colors.onSurface },
   subtitle: { ...typography.bodySm, color: colors.onSurfaceVariant },
   boxIndicator: {
@@ -386,6 +390,25 @@ const styles = StyleSheet.create({
   },
   boxDot: { width: 8, height: 8, borderRadius: 4 },
   boxStatus: { ...typography.labelCaps, fontSize: 10 },
+  noBoxBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: `${colors.error}15`,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: `${colors.error}30`,
+    marginTop: 8,
+    width: "100%",
+  },
+  noBoxText: {
+    ...typography.bodySm,
+    color: colors.error,
+    flex: 1,
+    lineHeight: 18,
+  },
   ringWrap: { alignItems: "center" },
   timerFace: {
     width: 240,
