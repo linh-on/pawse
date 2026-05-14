@@ -212,7 +212,15 @@ void handleCommand(const String& raw) {
     }
   }
   else if (verb == "resume") {
-    if (payload == "yes") {
+    // payload may be "yes" or "yes:1823" (seconds from app)
+    bool doResume = payload.startsWith("yes");
+    if (doResume) {
+      // Check for optional :seconds suffix sent by the app
+      int secondColon = payload.indexOf(':');
+      if (secondColon > 0) {
+        unsigned long appSecs = payload.substring(secondColon + 1).toInt();
+        if (appSecs > 0) resumeRemaining = appSecs * 1000UL;
+      }
       sessionEnd = millis() + resumeRemaining;
       setLock(false);
       state = LOCKED;
@@ -222,6 +230,17 @@ void handleCommand(const String& raw) {
       state = DONE;
       lcdShow("  Session End ", "  Good work!  ");
     }
+  }
+  else if (verb == "pause") {
+    int secs = payload.toInt();
+    resumeRemaining = (secs > 0)
+      ? (unsigned long)secs * 1000UL
+      : ((sessionEnd > millis()) ? (sessionEnd - millis()) : 0);
+    setLock(true);                            // unlock the box
+    state = RESUME;
+    String remStr = formatTime(resumeRemaining / 1000);
+    lcd.begin(16, 2);
+    lcdShow("Continue? Y/N ", remStr + " left");
   }
 
   // Immediately push new status after any command
@@ -270,6 +289,7 @@ void setup() {
 
   // ── Initialize BLE ──
   BLEDevice::init("PawseBuddy");
+  BLEDevice::setMTU(517);
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
 
@@ -328,6 +348,7 @@ void loop() {
       setLock(true);
       state = RESUME;
       String remStr = formatTime(resumeRemaining / 1000);
+      lcd.begin(16, 2);
       lcdShow("Continue? Y/N", remStr + " left");
       notifyStatus();
     } else if (digitalRead(NO_PIN) == LOW) {

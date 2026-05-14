@@ -94,8 +94,8 @@ const FocusDial = ({ minutes, onChange }) => {
 const dialStyles = StyleSheet.create({
   wrapper: { width: "100%", alignItems: "center" },
   row: { flexDirection: "row", width: "100%" },
-  column: { flex: 1 },
-  picker: { width: "100%" },
+  column: { flex: 1, height: 150, overflow: "hidden" },  // ← ADD height + overflow
+  picker: { width: "100%", height: 150 },                // ← ADD height
   pickerItem: { ...typography.h2, color: colors.warmBrown, fontSize: 20 },
 });
 
