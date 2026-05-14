@@ -202,6 +202,7 @@ void handleCommand(const String& raw) {
       setLock(true);
       state = RESUME;
       String remStr = formatTime(resumeRemaining / 1000);
+      lcd.begin(16, 2); 
       lcdShow("Continue? Y/N ", remStr + " left");
     } else {
       stopScroll();
