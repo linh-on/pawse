@@ -33,6 +33,7 @@ import {
 } from "../theme";
 import { responsive } from "../utils/responsive";
 import { useNotifSimulator } from "./active-session/useNotifSimulator";
+import { usePawseBox } from "../context/PawseBoxContext";
 import UrgentModal from "./active-session/UrgentModal";
 import NotifPanel from "./active-session/NotifPanel";
 
@@ -73,6 +74,36 @@ const fmt = (totalSecs) => {
     .padStart(2, "0");
   const sec = (s % 60).toString().padStart(2, "0");
   return `${m}:${sec}`;
+};
+
+const SCHOOL_GRACE_SECONDS = 10 * 60;
+
+const normalizeSeconds = (value, fallback = 0) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.floor(n));
+};
+
+const parseClockTime = (value) => {
+  if (!value || typeof value !== "string") return null;
+  const parts = value.split(":").map((p) => Number(p));
+  if (parts.some((n) => !Number.isFinite(n))) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+};
+
+const cleanLCDText = (text = "") => {
+  return String(text)
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const makeLCDUrgentText = (entry) => {
+  const raw =
+    entry?.aiSummary || entry?.summary || entry?.text || "Urgent message";
+  return cleanLCDText(raw).slice(0, 80);
 };
 
 const calcRemaining = (startedAt, durationMinutes) => {
@@ -166,18 +197,51 @@ const StudentLockScreen = ({
 }) => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const r = responsive(width);
-  const lockTimerSize = r.lockTimerSize;
-  const lockTimerFaceSize = Math.max(188, lockTimerSize - 48);
+
+  // Compact School Mode timer layout for smaller phones.
+  // The personal ActiveSession screen can be larger, but School Mode also has
+  // the box status, AI filter status, and emergency controls on one screen.
+  const isTinyScreen = height < 680;
+  const isShortScreen = height < 760;
+  const lockTimerSize = Math.round(
+    Math.min(
+      r.lockTimerSize ?? 260,
+      width * (isTinyScreen ? 0.5 : isShortScreen ? 0.56 : 0.62),
+      height * (isTinyScreen ? 0.24 : isShortScreen ? 0.27 : 0.3),
+    ),
+  );
+  const lockTimerFaceSize = Math.max(
+    126,
+    lockTimerSize - (isTinyScreen ? 34 : 40),
+  );
+  const lockStrokeWidth = isTinyScreen ? 7 : 8;
+  const lockIconSize = isTinyScreen ? 20 : isShortScreen ? 22 : 24;
+  const lockTimerFontSize = isTinyScreen ? 36 : isShortScreen ? 42 : 48;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const hasFinishedRef = useRef(false);
-  const focusSessionIdRef = useRef(focusSessionId ?? null);
+
+  const {
+    connected,
+    state: boxState,
+    remaining: boxRemaining,
+    actions,
+  } = usePawseBox();
 
   const totalSecs = (session?.duration_minutes ?? 0) * 60;
   const [remaining, setRemaining] = useState(() =>
     calcRemaining(session?.started_at, session?.duration_minutes),
   );
+  const [schoolBreak, setSchoolBreak] = useState(false);
+  const [pausedFocusSeconds, setPausedFocusSeconds] = useState(() =>
+    calcRemaining(session?.started_at, session?.duration_minutes),
+  );
+  const [graceRemaining, setGraceRemaining] = useState(SCHOOL_GRACE_SECONDS);
+
+  const hasFinishedRef = useRef(false);
+  const boxSessionStartedRef = useRef(false);
+  const focusSessionIdRef = useRef(focusSessionId ?? null);
+  const prevBoxState = useRef(boxState);
 
   useEffect(() => {
     focusSessionIdRef.current = focusSessionId ?? null;
@@ -201,6 +265,14 @@ const StudentLockScreen = ({
 
   const sim = useNotifSimulator({
     onNotificationClassified: saveNotificationLog,
+    onUrgentDetected: (entry) => {
+      if (connected) {
+        actions.sendUrgent(makeLCDUrgentText(entry));
+      }
+    },
+    onUrgentDismiss: () => {
+      if (connected) actions.respondUrgent(false);
+    },
     userId: user?.id,
   });
 
@@ -212,59 +284,177 @@ const StudentLockScreen = ({
     return () => sim.stop?.();
   }, []);
 
-  const finishSchoolMode = async ({ completed, override }) => {
-    if (hasFinishedRef.current) return;
-    hasFinishedRef.current = true;
+  const boxIsActive =
+    connected &&
+    (boxState === "LOCKED" ||
+      boxState === "URGENT" ||
+      boxState === "RESUME" ||
+      boxState === "DONE");
+  const boxRemainingSecs = boxIsActive ? parseClockTime(boxRemaining) : null;
+  const displayRemaining =
+    !schoolBreak && typeof boxRemainingSecs === "number" && boxRemainingSecs > 0
+      ? Math.min(remaining, boxRemainingSecs)
+      : remaining;
 
-    const endedAt = new Date().toISOString();
+  const finishSchoolMode = useCallback(
+    async ({ completed, override, skipHardwareEnd = false }) => {
+      if (hasFinishedRef.current) return;
+      hasFinishedRef.current = true;
 
-    if (session?.id) {
+      const endedAt = new Date().toISOString();
+
+      if (connected && !skipHardwareEnd) {
+        await actions.endSession();
+      }
+
+      if (session?.id) {
+        await supabase
+          .from("class_session_members")
+          .update({
+            left_at: endedAt,
+            ...(override ? { override_at: endedAt } : {}),
+          })
+          .eq("session_id", session.id)
+          .eq("student_id", user.id);
+      }
+
+      if (focusSessionIdRef.current) {
+        await supabase
+          .from("sessions")
+          .update({ ended_at: endedAt, completed })
+          .eq("id", focusSessionIdRef.current);
+      }
+
+      if (override) {
+        await supabase.from("override_log").insert({
+          student_id: user.id,
+          class_id: classInfo?.id ?? session?.class_id ?? null,
+          session_id: session?.id ?? null,
+          overrode_at: endedAt,
+        });
+      }
+
       await supabase
-        .from("class_session_members")
+        .from("school_mode")
         .update({
-          left_at: endedAt,
-          ...(override ? { override_at: endedAt } : {}),
+          is_on: false,
+          locked: false,
+          session_id: null,
+          focus_session_id: null,
+          updated_at: endedAt,
         })
-        .eq("session_id", session.id)
         .eq("student_id", user.id);
+
+      sim.stop?.();
+      if (override) onOverride?.();
+      else onComplete?.();
+    },
+    [
+      actions,
+      classInfo?.id,
+      connected,
+      onComplete,
+      onOverride,
+      session?.class_id,
+      session?.id,
+      sim,
+      user?.id,
+    ],
+  );
+
+  const enterSchoolBreak = useCallback(
+    async ({ skipHardwarePause = false } = {}) => {
+      if (hasFinishedRef.current) return;
+
+      const pausedSeconds = Math.max(0, Math.floor(displayRemaining));
+      setPausedFocusSeconds(pausedSeconds);
+      setGraceRemaining(SCHOOL_GRACE_SECONDS);
+      setSchoolBreak(true);
+      sim.clearModal?.();
+
+      if (connected && !skipHardwarePause) {
+        await actions.pauseSession(pausedSeconds);
+      }
+    },
+    [actions, connected, displayRemaining, sim],
+  );
+
+  const continueSchoolSession = useCallback(
+    async ({ skipHardwareResume = false } = {}) => {
+      if (hasFinishedRef.current) return;
+
+      const seconds = normalizeSeconds(pausedFocusSeconds, displayRemaining);
+      setRemaining(seconds);
+      setSchoolBreak(false);
+      setGraceRemaining(SCHOOL_GRACE_SECONDS);
+      boxSessionStartedRef.current = true;
+
+      if (connected && !skipHardwareResume) {
+        await actions.resume(true, seconds);
+      }
+    },
+    [actions, connected, displayRemaining, pausedFocusSeconds],
+  );
+
+  // When the student joins the teacher session, lock the servo and put the
+  // teacher's remaining timer on the LCD. resume:yes:<seconds> is used instead
+  // of start:<minutes> so late joiners do not restart the full class timer.
+  useEffect(() => {
+    if (
+      !connected ||
+      !session?.id ||
+      boxSessionStartedRef.current ||
+      schoolBreak
+    ) {
+      return;
     }
 
-    if (focusSessionIdRef.current) {
-      await supabase
-        .from("sessions")
-        .update({ ended_at: endedAt, completed })
-        .eq("id", focusSessionIdRef.current);
-    }
+    const seconds = calcRemaining(session.started_at, session.duration_minutes);
+    if (seconds <= 0) return;
 
-    if (override) {
-      await supabase.from("override_log").insert({
-        student_id: user.id,
-        class_id: classInfo?.id ?? session?.class_id ?? null,
-        session_id: session?.id ?? null,
-        overrode_at: endedAt,
-      });
-    }
+    boxSessionStartedRef.current = true;
+    actions.resume(true, seconds);
+  }, [
+    actions,
+    connected,
+    schoolBreak,
+    session?.duration_minutes,
+    session?.id,
+    session?.started_at,
+  ]);
 
-    await supabase
-      .from("school_mode")
-      .update({
-        is_on: false,
-        locked: false,
-        session_id: null,
-        focus_session_id: null,
-        updated_at: endedAt,
-      })
-      .eq("student_id", user.id);
+  // Keep the ESP32 timer close to the teacher's shared class timer. The
+  // firmware ignores sync while paused/resume, so this will not fight buttons.
+  useEffect(() => {
+    if (!connected || !session?.id || schoolBreak) return;
 
-    sim.stop?.();
-    if (override) onOverride?.();
-    else onComplete?.();
-  };
+    const id = setInterval(() => {
+      const seconds = calcRemaining(
+        session.started_at,
+        session.duration_minutes,
+      );
+      if (seconds > 0 && boxState === "LOCKED") {
+        actions.syncTimer(seconds);
+      }
+    }, 15000);
+
+    return () => clearInterval(id);
+  }, [
+    actions,
+    boxState,
+    connected,
+    schoolBreak,
+    session?.duration_minutes,
+    session?.id,
+    session?.started_at,
+  ]);
 
   // Countdown tick. All students calculate from the teacher's shared
   // class_sessions.started_at, so late joiners see the correct remaining time.
   useEffect(() => {
     const id = setInterval(() => {
+      if (schoolBreak) return;
+
       const next = calcRemaining(
         session?.started_at,
         session?.duration_minutes,
@@ -275,7 +465,67 @@ const StudentLockScreen = ({
       }
     }, 1000);
     return () => clearInterval(id);
-  }, [session?.started_at, session?.duration_minutes]);
+  }, [
+    finishSchoolMode,
+    schoolBreak,
+    session?.started_at,
+    session?.duration_minutes,
+  ]);
+
+  // Grace countdown while the phone/box is unlocked for an urgent break.
+  useEffect(() => {
+    if (!schoolBreak) return;
+    const id = setInterval(
+      () => setGraceRemaining((r) => (r > 0 ? r - 1 : 0)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, [schoolBreak]);
+
+  useEffect(() => {
+    if (!schoolBreak || graceRemaining > 0) return;
+    continueSchoolSession();
+  }, [continueSchoolSession, graceRemaining, schoolBreak]);
+
+  // Physical button sync, matching the individual flow:
+  // URGENT + YES  -> unlock and enter break screen
+  // URGENT + NO   -> dismiss urgent alert and keep locked
+  // RESUME + YES  -> re-lock and continue timer
+  // RESUME + NO   -> end/release school mode and notify teacher
+  useEffect(() => {
+    const prev = prevBoxState.current;
+    prevBoxState.current = boxState;
+
+    if (!connected || !boxState || boxState === prev) return;
+
+    if (prev === "URGENT" && boxState === "RESUME") {
+      enterSchoolBreak({ skipHardwarePause: true });
+    } else if (prev === "URGENT" && boxState === "LOCKED") {
+      sim.dismissModal?.();
+    } else if (prev === "RESUME" && boxState === "LOCKED") {
+      continueSchoolSession({ skipHardwareResume: true });
+    } else if (prev === "RESUME" && boxState === "DONE") {
+      finishSchoolMode({
+        completed: false,
+        override: true,
+        skipHardwareEnd: true,
+      });
+    } else if (!schoolBreak && prev === "LOCKED" && boxState === "DONE") {
+      finishSchoolMode({
+        completed: true,
+        override: false,
+        skipHardwareEnd: true,
+      });
+    }
+  }, [
+    boxState,
+    connected,
+    continueSchoolSession,
+    enterSchoolBreak,
+    finishSchoolMode,
+    schoolBreak,
+    sim,
+  ]);
 
   // Glow pulse (same as ActiveSession)
   useEffect(() => {
@@ -293,18 +543,20 @@ const StudentLockScreen = ({
         }),
       ]),
     ).start();
-  }, []);
+  }, [pulseAnim]);
 
-  const progress = totalSecs > 0 ? remaining / totalSecs : 0;
+  const handleUrgentOverride = () => {
+    enterSchoolBreak();
+  };
 
-  const handleOverride = () => {
+  const handleGiveUp = () => {
     Alert.alert(
-      "Emergency Override",
-      "School Mode will turn off and your teacher will be notified. Are you sure?",
+      "End School Mode?",
+      "Your teacher will see that you overrode this session.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Override",
+          text: "End Session",
           style: "destructive",
           onPress: () => finishSchoolMode({ completed: false, override: true }),
         },
@@ -312,17 +564,93 @@ const StudentLockScreen = ({
     );
   };
 
-  const handleUrgentOverride = () => {
-    sim.clearModal?.();
-    finishSchoolMode({ completed: false, override: true });
-  };
-
   // iOS gets a full notification simulator panel similar to the personal
   // ActiveSession screen. Android keeps the compact AI status pill — real
   // notification interception works there and there's nothing to "play".
   const isIOS = Platform.OS === "ios";
+  const progress = totalSecs > 0 ? displayRemaining / totalSecs : 0;
+  const graceProgress =
+    SCHOOL_GRACE_SECONDS > 0 ? graceRemaining / SCHOOL_GRACE_SECONDS : 0;
 
-  const Body = (
+  const BreakBody = (
+    <>
+      <View style={lockStyles.header}>
+        <Text style={lockStyles.className}>{classInfo?.name ?? "Class"}</Text>
+        <Text style={lockStyles.modeLabel}>EMERGENCY BREAK</Text>
+      </View>
+
+      <Animated.View
+        style={{ transform: [{ scale: pulseAnim }], alignSelf: "center" }}
+      >
+        <CircularProgress
+          size={lockTimerSize}
+          strokeWidth={lockStrokeWidth}
+          progress={graceProgress}
+          trackColor={`${colors.error}22`}
+          fillColor={colors.error}
+        >
+          <View
+            style={[
+              lockStyles.timerFace,
+              {
+                width: lockTimerFaceSize,
+                height: lockTimerFaceSize,
+                borderRadius: lockTimerFaceSize / 2,
+                borderColor: `${colors.error}22`,
+              },
+            ]}
+          >
+            <MaterialIcons
+              name="timer-off"
+              size={lockIconSize}
+              color={colors.error}
+              style={{ marginBottom: isTinyScreen ? 3 : 5 }}
+            />
+            <Text
+              style={[
+                lockStyles.timerText,
+                { color: colors.error, fontSize: lockTimerFontSize },
+              ]}
+            >
+              {fmt(graceRemaining)}
+            </Text>
+            <Text style={lockStyles.timerSub}>grace left</Text>
+          </View>
+        </CircularProgress>
+      </Animated.View>
+
+      <View style={lockStyles.breakMeta}>
+        <Text style={lockStyles.breakMetaText}>
+          Focus timer paused at {fmt(pausedFocusSeconds)}.
+        </Text>
+        <Text style={lockStyles.breakMetaText}>
+          Press YES on the box or Continue here to lock again.
+        </Text>
+      </View>
+
+      <View style={lockStyles.breakActions}>
+        <TouchableOpacity
+          style={lockStyles.breakPrimaryBtn}
+          onPress={() => continueSchoolSession()}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="lock" size={18} color="#fff" />
+          <Text style={lockStyles.breakPrimaryText}>Continue Session</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={lockStyles.breakSecondaryBtn}
+          onPress={handleGiveUp}
+          activeOpacity={0.75}
+        >
+          <Text style={lockStyles.breakSecondaryText}>Give up for today</Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
+  const Body = schoolBreak ? (
+    BreakBody
+  ) : (
     <>
       {/* Header */}
       <View style={lockStyles.header}>
@@ -336,7 +664,7 @@ const StudentLockScreen = ({
       >
         <CircularProgress
           size={lockTimerSize}
-          strokeWidth={10}
+          strokeWidth={lockStrokeWidth}
           progress={progress}
           trackColor={`${colors.orange}22`}
           fillColor={colors.orange}
@@ -353,15 +681,40 @@ const StudentLockScreen = ({
           >
             <MaterialIcons
               name="lock"
-              size={28}
+              size={lockIconSize}
               color={colors.orange}
-              style={{ marginBottom: 6 }}
+              style={{ marginBottom: isTinyScreen ? 3 : 5 }}
             />
-            <Text style={lockStyles.timerText}>{fmt(remaining)}</Text>
+            <Text
+              style={[lockStyles.timerText, { fontSize: lockTimerFontSize }]}
+            >
+              {fmt(displayRemaining)}
+            </Text>
             <Text style={lockStyles.timerSub}>remaining</Text>
           </View>
         </CircularProgress>
       </Animated.View>
+
+      <View style={lockStyles.boxIndicator}>
+        <View
+          style={[
+            lockStyles.boxDot,
+            { backgroundColor: connected ? "#1F8A3F" : colors.outlineVariant },
+          ]}
+        />
+        <Text
+          style={[
+            lockStyles.boxStatus,
+            { color: connected ? "#1F8A3F" : `${colors.primaryFixedDim}88` },
+          ]}
+        >
+          {connected
+            ? boxState === "URGENT"
+              ? "Box showing urgent alert"
+              : "Box connected"
+            : "Connect PawseBuddy before joining for servo + LCD"}
+        </Text>
+      </View>
 
       {isIOS ? (
         <NotifPanel
@@ -393,6 +746,18 @@ const StudentLockScreen = ({
         </View>
       )}
 
+      <TouchableOpacity
+        style={lockStyles.overrideBtn}
+        onPress={() => enterSchoolBreak()}
+        activeOpacity={0.75}
+      >
+        <View style={lockStyles.overrideCircle}>
+          <MaterialIcons name="emergency" size={20} color={colors.outline} />
+        </View>
+        <Text style={lockStyles.overrideCaption}>In case of emergency</Text>
+        <Text style={lockStyles.overrideLink}>Urgent Override</Text>
+      </TouchableOpacity>
+
       <Text style={lockStyles.hint}>Stay focused 📚</Text>
     </>
   );
@@ -409,11 +774,16 @@ const StudentLockScreen = ({
     >
       <StatusBar barStyle="light-content" />
 
-      {isIOS ? (
+      {isIOS || schoolBreak ? (
         <ScrollView
           contentContainerStyle={[
             lockStyles.scrollContent,
-            { paddingHorizontal: r.screenPadding },
+            {
+              paddingHorizontal: Math.min(
+                r.screenPadding,
+                isTinyScreen ? 14 : 18,
+              ),
+            },
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -423,7 +793,15 @@ const StudentLockScreen = ({
         <View
           style={[
             lockStyles.androidWrap,
-            { paddingHorizontal: r.screenPadding },
+            {
+              paddingHorizontal: Math.min(
+                r.screenPadding,
+                isTinyScreen ? 14 : 18,
+              ),
+              paddingTop: isTinyScreen ? spacing.sm : spacing.md,
+              paddingBottom: isTinyScreen ? spacing.xs : spacing.sm,
+              gap: isTinyScreen ? 6 : spacing.sm,
+            },
           ]}
         >
           {Body}
@@ -434,7 +812,7 @@ const StudentLockScreen = ({
         entry={sim.urgentModal}
         scale={sim.modalScale}
         opacity={sim.modalOpacity}
-        connected={false}
+        connected={connected}
         onDismiss={sim.dismissModal}
         onOverride={handleUrgentOverride}
       />
@@ -450,30 +828,32 @@ const lockStyles = StyleSheet.create({
   // iOS scroll layout — fits the NotifPanel under the timer
   scrollContent: {
     alignItems: "center",
-    gap: spacing.md,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
   // Android — centered, compact, no scrolling
   androidWrap: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
+    justifyContent: "space-evenly",
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
   },
-  header: { alignItems: "center", gap: 6 },
+  header: { alignItems: "center", gap: 3 },
   className: {
     ...typography.h2,
     color: colors.primaryFixedDim,
     textAlign: "center",
+    fontSize: 20,
+    lineHeight: 24,
   },
   modeLabel: {
     ...typography.labelCaps,
     color: colors.orange,
-    letterSpacing: 2,
-    fontSize: 11,
+    letterSpacing: 1.4,
+    fontSize: 8,
   },
   timerFace: {
     width: 232,
@@ -486,23 +866,29 @@ const lockStyles = StyleSheet.create({
     borderColor: `${colors.orange}22`,
     ...shadows.timer,
   },
-  timerText: { ...typography.timerDisplay, color: colors.primaryFixedDim },
+  timerText: {
+    ...typography.timerDisplay,
+    color: colors.primaryFixedDim,
+    lineHeight: 54,
+  },
   timerSub: {
     ...typography.labelCaps,
     color: `${colors.primaryFixedDim}88`,
-    marginTop: 6,
+    marginTop: 2,
+    fontSize: 9,
   },
   hint: {
-    ...typography.bodyMd,
+    ...typography.bodySm,
     color: `${colors.primaryFixedDim}66`,
     textAlign: "center",
+    fontSize: 12,
   },
   aiStatusBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: radii.full,
     backgroundColor: `${colors.orange}14`,
     borderWidth: 1,
@@ -512,7 +898,8 @@ const lockStyles = StyleSheet.create({
   aiStatusText: {
     ...typography.bodySm,
     color: `${colors.primaryFixedDim}AA`,
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 15,
     flexShrink: 1,
   },
   permissionLink: {
@@ -521,10 +908,10 @@ const lockStyles = StyleSheet.create({
     fontWeight: "800",
     textDecorationLine: "underline",
   },
-  overrideBtn: { alignItems: "center", gap: 6, paddingBottom: spacing.md },
+  overrideBtn: { alignItems: "center", gap: 3, paddingBottom: spacing.xs },
   overrideCircle: {
-    width: 52,
-    height: 52,
+    width: 42,
+    height: 42,
     borderRadius: radii.full,
     backgroundColor: `${colors.outline}18`,
     alignItems: "center",
@@ -543,6 +930,69 @@ const lockStyles = StyleSheet.create({
     fontWeight: "700",
     textDecorationLine: "underline",
     textDecorationStyle: "dotted",
+  },
+
+  boxIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    backgroundColor: `${colors.primaryFixedDim}10`,
+    maxWidth: "100%",
+  },
+  boxDot: { width: 8, height: 8, borderRadius: 4 },
+  boxStatus: {
+    ...typography.labelCaps,
+    fontSize: 8,
+    lineHeight: 12,
+    textAlign: "center",
+    flexShrink: 1,
+  },
+  breakMeta: {
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: spacing.sm,
+  },
+  breakMetaText: {
+    ...typography.bodySm,
+    color: `${colors.primaryFixedDim}AA`,
+    textAlign: "center",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  breakActions: {
+    width: "100%",
+    gap: 8,
+    alignItems: "center",
+  },
+  breakPrimaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.orange,
+    borderRadius: radii.full,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    minWidth: 190,
+  },
+  breakPrimaryText: {
+    ...typography.bodySm,
+    color: "#fff",
+    fontWeight: "800",
+  },
+  breakSecondaryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  breakSecondaryText: {
+    ...typography.bodySm,
+    color: `${colors.primaryFixedDim}88`,
+    fontWeight: "700",
+    textDecorationLine: "underline",
   },
 });
 
@@ -2178,6 +2628,14 @@ const StudentViewInner = ({ insets, meta }) => {
   const [sessionModal, setSessionModal] = useState(false);
   const [sessionCodeInput, setSessionCodeInput] = useState("");
 
+  // ── Same "put your phone in the box" countdown as personal focus ──
+  // The student only gets written into school_mode/class_session_members
+  // after this finishes, so the teacher sees them join when the box locks.
+  const [joinCountdown, setJoinCountdown] = useState(null);
+  const [startingSchoolMode, setStartingSchoolMode] = useState(false);
+  const joinCountdownAnim = useRef(new Animated.Value(1)).current;
+  const pendingSchoolJoinRef = useRef(null);
+
   // IMPORTANT: this was missing in v2. Without it, pressing Turn On
   // writes the student into class_session_members, but the local UI can crash
   // before setActiveSession/setSchoolModeOn runs, so the teacher sees the
@@ -2304,6 +2762,12 @@ const StudentViewInner = ({ insets, meta }) => {
     setSessionModal(true);
   };
 
+  const cancelSchoolCountdown = () => {
+    pendingSchoolJoinRef.current = null;
+    setStartingSchoolMode(false);
+    setJoinCountdown(null);
+  };
+
   const createOrReuseFocusSession = async (classSession) => {
     // One personal `sessions` row per student per teacher-led class session.
     // This lets existing notification_logs keep using notification_logs.session_id
@@ -2345,23 +2809,37 @@ const StudentViewInner = ({ insets, meta }) => {
     return focusSession.id;
   };
 
-  const confirmSessionCode = async () => {
-    const code = sessionCodeInput.trim().toUpperCase();
-    if (!code) return;
+  const finalizeSchoolModeJoin = async () => {
+    const pending = pendingSchoolJoinRef.current;
+    if (!pending || !user?.id) {
+      setStartingSchoolMode(false);
+      return;
+    }
+
+    setStartingSchoolMode(true);
+    const { code, classId } = pending;
+
     const { data: sess } = await supabase
       .from("class_sessions")
       .select(
         "id, class_id, duration_minutes, started_at, session_code, active",
       )
-      .eq("class_id", selected.id)
+      .eq("id", pending.sessionId)
+      .eq("class_id", classId)
       .eq("active", true)
       .maybeSingle();
+
     if (!sess || sess.session_code !== code) {
-      Alert.alert("Wrong code", "Check with your teacher and try again.");
+      pendingSchoolJoinRef.current = null;
+      setStartingSchoolMode(false);
+      Alert.alert(
+        "Session ended",
+        "Your teacher's session is no longer active.",
+      );
       return;
     }
 
-    // Detect rejoin: an existing class_session_members row with override_at set
+    // Re-check membership after the countdown so we don't use stale data.
     const { data: existing } = await supabase
       .from("class_session_members")
       .select("id, joined_at, override_at, focus_session_id")
@@ -2384,14 +2862,18 @@ const StudentViewInner = ({ insets, meta }) => {
     } else {
       await supabase.from("class_session_members").insert({
         session_id: sess.id,
-        class_id: selected.id,
+        class_id: classId,
         student_id: user.id,
         joined_at: nowIso,
       });
     }
 
     const focusSessionId = await createOrReuseFocusSession(sess);
-    if (!focusSessionId) return;
+    if (!focusSessionId) {
+      pendingSchoolJoinRef.current = null;
+      setStartingSchoolMode(false);
+      return;
+    }
 
     if (isRejoin) {
       // Reopen the personal sessions row
@@ -2414,7 +2896,7 @@ const StudentViewInner = ({ insets, meta }) => {
         student_id: user.id,
         is_on: true,
         locked: true,
-        class_id: selected.id,
+        class_id: classId,
         session_id: sess.id,
         focus_session_id: focusSessionId,
         updated_at: nowIso,
@@ -2422,17 +2904,133 @@ const StudentViewInner = ({ insets, meta }) => {
       { onConflict: "student_id" },
     );
 
+    pendingSchoolJoinRef.current = null;
     activeSessionRef.current = { ...sess, focus_session_id: focusSessionId };
     setActiveSession({ ...sess, focus_session_id: focusSessionId });
     setSchoolModeOn(true);
+    setStartingSchoolMode(false);
+  };
+
+  const confirmSessionCode = async () => {
+    const code = sessionCodeInput.trim().toUpperCase();
+    if (!code || startingSchoolMode || joinCountdown !== null) return;
+
+    setStartingSchoolMode(true);
+
+    const { data: sess } = await supabase
+      .from("class_sessions")
+      .select(
+        "id, class_id, duration_minutes, started_at, session_code, active",
+      )
+      .eq("class_id", selected.id)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (!sess || sess.session_code !== code) {
+      Alert.alert("Wrong code", "Check with your teacher and try again.");
+      setStartingSchoolMode(false);
+      return;
+    }
+
+    pendingSchoolJoinRef.current = {
+      classId: selected.id,
+      sessionId: sess.id,
+      code,
+    };
+
     setSessionModal(false);
     setSessionCodeInput("");
+    setJoinCountdown(10);
+    setStartingSchoolMode(false);
   };
+
+  useEffect(() => {
+    if (joinCountdown === null) return;
+
+    if (joinCountdown <= 0) {
+      setJoinCountdown(null);
+      finalizeSchoolModeJoin();
+      return;
+    }
+
+    joinCountdownAnim.setValue(1.3);
+    Animated.timing(joinCountdownAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    const id = setTimeout(
+      () => setJoinCountdown((c) => (c === null ? null : c - 1)),
+      1000,
+    );
+    return () => clearTimeout(id);
+  }, [joinCountdown, joinCountdownAnim]);
 
   const handleOverride = () => {
     setSchoolModeOn(false);
     setActiveSession(null);
   };
+
+  // IMPORTANT: render this BEFORE the full-screen School Mode lock screen.
+  // Otherwise the lock screen can take over so fast that the student never sees
+  // the same “Put your phone in the box” countdown used on HomeScreen.
+  if (joinCountdown !== null) {
+    return (
+      <View style={styles.screen}>
+        <Header />
+        <Modal
+          visible={joinCountdown !== null}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+        >
+          <View style={styles.overlayBackdrop}>
+            <View style={[styles.overlayCard, shadows.soft]}>
+              <MaterialIcons
+                name="phonelink-lock"
+                size={48}
+                color={colors.primaryContainer}
+              />
+
+              <Text style={styles.overlayTitle}>Put your phone in the box</Text>
+              <Text style={styles.overlaySubtitle}>
+                School Mode will begin in
+              </Text>
+
+              <Animated.Text
+                style={[
+                  styles.overlayCountdown,
+                  { transform: [{ scale: joinCountdownAnim }] },
+                ]}
+              >
+                {joinCountdown}
+              </Animated.Text>
+
+              <View style={styles.overlayProgressTrack}>
+                <View
+                  style={[
+                    styles.overlayProgressFill,
+                    {
+                      width: `${((10 - (joinCountdown ?? 0)) / 10) * 100}%`,
+                    },
+                  ]}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.overlayCancelBtn}
+                onPress={cancelSchoolCountdown}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.overlayCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
 
   // Full screen lock — no header, no scroll
   if (schoolModeOn && activeSession) {
@@ -2788,12 +3386,70 @@ const StudentViewInner = ({ insets, meta }) => {
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionBtn, { flex: 1 }]}
+                style={[
+                  styles.actionBtn,
+                  { flex: 1 },
+                  startingSchoolMode && { opacity: 0.65 },
+                ]}
                 onPress={confirmSessionCode}
+                disabled={startingSchoolMode}
               >
-                <Text style={styles.actionBtnText}>Turn On</Text>
+                {startingSchoolMode ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.actionBtnText}>Turn On</Text>
+                )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── "Put your phone in the box" countdown overlay ── */}
+      <Modal
+        visible={joinCountdown !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={styles.overlayBackdrop}>
+          <View style={[styles.overlayCard, shadows.soft]}>
+            <MaterialIcons
+              name="phonelink-lock"
+              size={48}
+              color={colors.primaryContainer}
+            />
+
+            <Text style={styles.overlayTitle}>Put your phone in the box</Text>
+            <Text style={styles.overlaySubtitle}>
+              School Mode will begin in
+            </Text>
+
+            <Animated.Text
+              style={[
+                styles.overlayCountdown,
+                { transform: [{ scale: joinCountdownAnim }] },
+              ]}
+            >
+              {joinCountdown}
+            </Animated.Text>
+
+            <View style={styles.overlayProgressTrack}>
+              <View
+                style={[
+                  styles.overlayProgressFill,
+                  { width: `${((10 - (joinCountdown ?? 0)) / 10) * 100}%` },
+                ]}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.overlayCancelBtn}
+              onPress={cancelSchoolCountdown}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.overlayCancelText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -2937,6 +3593,65 @@ const styles = StyleSheet.create({
     ...typography.bodySm,
     color: colors.primary,
     fontWeight: "600",
+  },
+
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(30,20,10,0.72)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.containerPadding,
+  },
+  overlayCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radii["4xl"],
+    padding: spacing.xl,
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  overlayTitle: {
+    ...typography.h2,
+    color: colors.warmBrown,
+    textAlign: "center",
+  },
+  overlaySubtitle: {
+    ...typography.bodyMd,
+    color: colors.onSurfaceVariant,
+    textAlign: "center",
+  },
+  overlayCountdown: {
+    ...typography.timerDisplay,
+    fontSize: 56,
+    color: colors.primary,
+    marginVertical: 2,
+  },
+  overlayProgressTrack: {
+    width: "100%",
+    height: 8,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainer,
+    overflow: "hidden",
+    marginTop: 4,
+  },
+  overlayProgressFill: {
+    height: "100%",
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryContainer,
+  },
+  overlayCancelBtn: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  overlayCancelText: {
+    ...typography.bodySm,
+    color: colors.primary,
+    fontWeight: "700",
   },
 
   generateBtn: {
