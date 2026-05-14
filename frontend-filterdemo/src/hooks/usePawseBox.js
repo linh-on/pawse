@@ -138,6 +138,13 @@ export function usePawseBox() {
       return; // bad base64, skip silently
     }
 
+    // ESP32 characteristics often use a fixed-size buffer padded with 0xFF
+    // or other non-printable bytes. Strip everything after the last '}' so
+    // JSON.parse doesn't choke on the trailing garbage.
+    const lastBrace = json.lastIndexOf("}");
+    if (lastBrace === -1) return; // no valid JSON object at all
+    json = json.substring(0, lastBrace + 1);
+
     let data;
     try {
       data = JSON.parse(json);
@@ -252,7 +259,7 @@ export function usePawseBox() {
           // the actual negotiated value.
           if (Platform.OS === "android") {
             try {
-              const mtuDevice = await d.requestMTU(185);
+              const mtuDevice = await d.requestMTU(512);
               console.log("Negotiated MTU:", mtuDevice.mtu);
             } catch (mtuErr) {
               console.warn(

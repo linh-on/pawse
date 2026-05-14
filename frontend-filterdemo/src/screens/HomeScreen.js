@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   StyleSheet,
   useWindowDimensions,
   TextInput,
+  Animated,
+  Modal,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -16,7 +18,6 @@ import { colors, spacing, radii, shadows, typography } from "../theme";
 import { responsive } from "../utils/responsive";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/AuthContext";
-import { Picker } from "@react-native-picker/picker";
 
 const DEFAULT_PREP = [
   { label: "Silence phone notifications" },
@@ -50,53 +51,203 @@ const getCurrentStreak = (sessions) => {
   return streak;
 };
 
+const PRESETS = [15, 30, 45, 60];
+
 const FocusDial = ({ minutes, onChange }) => {
   const hrs = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  const hours = Array.from({ length: 9 }, (_, i) => i);
-  const minuteOptions = Array.from({ length: 60 }, (_, i) => i);
 
-  const handleHourChange = (v) => onChange(Math.max(1, v * 60 + mins));
-  const handleMinChange = (v) => onChange(Math.max(1, hrs * 60 + v));
+  const adjustHours = (delta) => {
+    const newHrs = Math.max(0, Math.min(8, hrs + delta));
+    const total = newHrs * 60 + mins;
+    onChange(Math.max(1, total));
+  };
+
+  const adjustMins = (delta) => {
+    const newMins = (((mins + delta) % 60) + 60) % 60;
+    const total = hrs * 60 + newMins;
+    onChange(Math.max(1, total));
+  };
+
+  const isPreset = PRESETS.includes(minutes);
 
   return (
     <View style={dialStyles.wrapper}>
-      <View style={dialStyles.row}>
-        <View style={dialStyles.column}>
-          <Picker
-            selectedValue={hrs}
-            onValueChange={handleHourChange}
-            style={dialStyles.picker}
-            itemStyle={dialStyles.pickerItem}
+      {/* Hour / Minute steppers */}
+      <View style={dialStyles.stepperRow}>
+        {/* Hours */}
+        <View style={dialStyles.stepperGroup}>
+          <TouchableOpacity
+            style={dialStyles.stepBtn}
+            onPress={() => adjustHours(-1)}
+            activeOpacity={0.7}
           >
-            {hours.map((h) => (
-              <Picker.Item key={h} label={`${h} hr`} value={h} />
-            ))}
-          </Picker>
-        </View>
-        <View style={dialStyles.column}>
-          <Picker
-            selectedValue={mins}
-            onValueChange={handleMinChange}
-            style={dialStyles.picker}
-            itemStyle={dialStyles.pickerItem}
+            <MaterialIcons
+              name="remove"
+              size={20}
+              color={colors.onSurfaceVariant}
+            />
+          </TouchableOpacity>
+          <View
+            style={[
+              dialStyles.stepValue,
+              !isPreset && dialStyles.stepValueCustom,
+            ]}
           >
-            {minuteOptions.map((m) => (
-              <Picker.Item key={m} label={`${m} min`} value={m} />
-            ))}
-          </Picker>
+            <Text style={dialStyles.stepNumber}>{hrs}</Text>
+            <Text style={dialStyles.stepLabel}>hr</Text>
+          </View>
+          <TouchableOpacity
+            style={dialStyles.stepBtn}
+            onPress={() => adjustHours(1)}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="add"
+              size={20}
+              color={colors.onSurfaceVariant}
+            />
+          </TouchableOpacity>
         </View>
+
+        <Text style={dialStyles.stepColon}>:</Text>
+
+        {/* Minutes */}
+        <View style={dialStyles.stepperGroup}>
+          <TouchableOpacity
+            style={dialStyles.stepBtn}
+            onPress={() => adjustMins(-1)}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="remove"
+              size={20}
+              color={colors.onSurfaceVariant}
+            />
+          </TouchableOpacity>
+          <View
+            style={[
+              dialStyles.stepValue,
+              !isPreset && dialStyles.stepValueCustom,
+            ]}
+          >
+            <Text style={dialStyles.stepNumber}>
+              {String(mins).padStart(2, "0")}
+            </Text>
+            <Text style={dialStyles.stepLabel}>min</Text>
+          </View>
+          <TouchableOpacity
+            style={dialStyles.stepBtn}
+            onPress={() => adjustMins(1)}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="add"
+              size={20}
+              color={colors.onSurfaceVariant}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+      {/* Preset chips */}
+      <View style={dialStyles.presetRow}>
+        {PRESETS.map((p) => (
+          <TouchableOpacity
+            key={p}
+            style={[
+              dialStyles.presetChip,
+              minutes === p && dialStyles.presetChipActive,
+            ]}
+            onPress={() => onChange(p)}
+            activeOpacity={0.75}
+          >
+            <Text
+              style={[
+                dialStyles.presetText,
+                minutes === p && dialStyles.presetTextActive,
+              ]}
+            >
+              {formatMinutes(p)}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
 };
 
 const dialStyles = StyleSheet.create({
-  wrapper: { width: "100%", alignItems: "center" },
-  row: { flexDirection: "row", width: "100%" },
-  column: { flex: 1, height: 150, overflow: "hidden" },  // ← ADD height + overflow
-  picker: { width: "100%", height: 150 },                // ← ADD height
-  pickerItem: { ...typography.h2, color: colors.warmBrown, fontSize: 20 },
+  wrapper: { width: "100%", alignItems: "center", gap: spacing.md },
+  presetRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+  },
+  presetChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  presetChipActive: {
+    backgroundColor: colors.primaryContainer,
+    borderColor: `${colors.primary}40`,
+  },
+  presetText: {
+    ...typography.bodySm,
+    fontWeight: "700",
+    color: colors.onSurfaceVariant,
+  },
+  presetTextActive: {
+    color: colors.onPrimaryContainer,
+  },
+  stepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  stepperGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  stepBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepValue: {
+    alignItems: "center",
+    minWidth: 48,
+  },
+  stepValueCustom: {
+    // subtle highlight when using a non-preset custom time
+  },
+  stepNumber: {
+    ...typography.h2,
+    fontSize: 28,
+    color: colors.warmBrown,
+  },
+  stepLabel: {
+    ...typography.labelCaps,
+    fontSize: 9,
+    color: colors.outline,
+    marginTop: -2,
+  },
+  stepColon: {
+    ...typography.h2,
+    fontSize: 24,
+    color: colors.outlineVariant,
+    marginHorizontal: 2,
+    marginBottom: 12,
+  },
 });
 
 const HomeScreen = () => {
@@ -113,6 +264,40 @@ const HomeScreen = () => {
   const [prepItems, setPrepItems] = useState([]);
   const [checkedItems, setCheckedItems] = useState({});
   const [editMode, setEditMode] = useState(false);
+
+  // ── "Put your phone in the box" countdown ──────────────
+  const [countdown, setCountdown] = useState(null); // null = not active
+  const countdownAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (countdown === null) return;
+
+    if (countdown <= 0) {
+      setCountdown(null);
+      navigation.navigate("ActiveSession", { durationMinutes: minutes });
+      return;
+    }
+
+    // Pulse animation on each tick
+    countdownAnim.setValue(1.3);
+    Animated.timing(countdownAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [countdown, minutes, navigation, countdownAnim]);
+
+  const startCountdown = () => {
+    if (countdown !== null) return;
+    setCountdown(10);
+  };
+
+  const cancelCountdown = () => {
+    setCountdown(null);
+  };
 
   const fetchHomeStats = useCallback(async () => {
     if (!user?.id) {
@@ -373,9 +558,7 @@ const HomeScreen = () => {
 
           <TouchableOpacity
             style={[styles.startBtn, shadows.soft]}
-            onPress={() =>
-              navigation.navigate("ActiveSession", { durationMinutes: minutes })
-            }
+            onPress={startCountdown}
             activeOpacity={0.85}
           >
             <MaterialIcons
@@ -387,6 +570,55 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* ── "Put your phone in the box" countdown overlay ── */}
+      <Modal
+        visible={countdown !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={styles.overlayBackdrop}>
+          <View style={[styles.overlayCard, shadows.soft]}>
+            <MaterialIcons
+              name="phonelink-lock"
+              size={48}
+              color={colors.primaryContainer}
+            />
+
+            <Text style={styles.overlayTitle}>Put your phone in the box</Text>
+            <Text style={styles.overlaySubtitle}>
+              Your session will begin when the timer ends
+            </Text>
+
+            <Animated.Text
+              style={[
+                styles.overlayCountdown,
+                { transform: [{ scale: countdownAnim }] },
+              ]}
+            >
+              {countdown}
+            </Animated.Text>
+
+            <View style={styles.overlayProgressTrack}>
+              <View
+                style={[
+                  styles.overlayProgressFill,
+                  { width: `${((10 - (countdown ?? 0)) / 10) * 100}%` },
+                ]}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.overlayCancelBtn}
+              onPress={cancelCountdown}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.overlayCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -552,6 +784,69 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   startBtnText: { ...typography.h2, color: colors.onPrimaryContainer },
+
+  // ── Countdown overlay ─────────────────────
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  overlayCard: {
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radii["4xl"],
+    paddingVertical: spacing.xl + spacing.md,
+    paddingHorizontal: spacing.xl,
+    alignItems: "center",
+    gap: spacing.md,
+    width: "100%",
+    maxWidth: 340,
+    borderWidth: 1,
+    borderColor: `${colors.orange}18`,
+  },
+  overlayTitle: {
+    ...typography.h2,
+    color: colors.warmBrown,
+    textAlign: "center",
+    fontSize: 20,
+  },
+  overlaySubtitle: {
+    ...typography.bodySm,
+    color: colors.onSurfaceVariant,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  overlayCountdown: {
+    ...typography.timerDisplay,
+    fontSize: 64,
+    color: colors.primaryContainer,
+    marginVertical: spacing.sm,
+  },
+  overlayProgressTrack: {
+    width: "100%",
+    height: 6,
+    backgroundColor: colors.surfaceContainerHighest,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  overlayProgressFill: {
+    height: "100%",
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 3,
+  },
+  overlayCancelBtn: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  overlayCancelText: {
+    ...typography.bodySm,
+    color: colors.outline,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+    textDecorationStyle: "dotted",
+  },
 });
 
 export default HomeScreen;

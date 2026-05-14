@@ -38,7 +38,7 @@ const GracePeriodScreen = () => {
   const timerSize = r.timerSize;
   const timerFaceSize = Math.max(190, timerSize - 48);
   const { user } = useAuth();
-  const { connected, actions } = usePawseBox();
+  const { connected, state: boxState, actions } = usePawseBox();
 
   const {
     durationMinutes = 45,
@@ -57,6 +57,52 @@ const GracePeriodScreen = () => {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const hasLeftRef = useRef(false);
+  const prevBoxState = useRef(boxState);
+
+  // ── Sync physical buttons with phone UI ──────────────
+  // When the user presses YES/NO on the box while this screen is showing,
+  // the ESP32 transitions out of RESUME. Mirror that on the phone.
+  useEffect(() => {
+    if (!connected) {
+      prevBoxState.current = boxState;
+      return;
+    }
+
+    const wasResume = prevBoxState.current === "RESUME";
+    prevBoxState.current = boxState;
+
+    if (!wasResume || hasLeftRef.current) return;
+
+    if (boxState === "LOCKED") {
+      // Physical YES — user wants to continue the session
+      hasLeftRef.current = true;
+      navigation.replace("ActiveSession", {
+        durationMinutes,
+        initialRemainingSeconds: pausedFocusSeconds,
+        existingSessionId: sessionId,
+      });
+    } else if (boxState === "DONE") {
+      // Physical NO — user wants to end the session
+      hasLeftRef.current = true;
+      if (sessionId) {
+        supabase
+          .from("sessions")
+          .update({ ended_at: new Date().toISOString(), completed: false })
+          .eq("id", sessionId)
+          .then(({ error }) => {
+            if (error) console.warn("Could not end session:", error.message);
+          });
+      }
+      navigation.replace("HomeScreen");
+    }
+  }, [
+    boxState,
+    connected,
+    navigation,
+    durationMinutes,
+    pausedFocusSeconds,
+    sessionId,
+  ]);
 
   useEffect(() => {
     async function fetchGracePeriod() {

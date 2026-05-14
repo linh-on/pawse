@@ -51,6 +51,20 @@ BLECharacteristic *pStatusChar = nullptr;
 BLECharacteristic *pCommandChar = nullptr;
 bool deviceConnected = false;
 
+// ── Command queue ───────────────────────────────────────
+// BLE onWrite runs in the BLE task, but LCD/servo must only be
+// touched from loop() (main task). Buffer one command at a time
+// using a plain char array — no String heap ops across tasks.
+#define CMD_BUF_SIZE 64
+volatile bool cmdPending = false;
+char cmdBuffer[CMD_BUF_SIZE];
+
+void enqueueCommand(const String& cmd) {
+  if (cmdPending) return;                       // previous not yet consumed
+  cmd.toCharArray(cmdBuffer, CMD_BUF_SIZE);
+  cmdPending = true;                            // main task will pick it up
+}
+
 Servo lockServo;
 
 // ── State (unchanged) ────────────────────────────────────
@@ -156,14 +170,15 @@ String buildStatusJson() {
   }
 
   // Short keys: {"s":"L","r":"30:47","u":""}
-  // Max length ~40 bytes — fits comfortably in default MTU
+  // The "u" field is always empty now — the app receives urgent text
+  // via the sendUrgent command, not from status polling. Keeping the
+  // key present for backward compat but empty so the JSON stays
+  // under ~30 bytes and never hits MTU limits.
   String json = "{\"s\":\"";
   json += s;
   json += "\",\"r\":\"";
   json += formatTime(rem);
-  json += "\",\"u\":\"";
-  json += urgentMsg;
-  json += "\"}";
+  json += "\",\"u\":\"\"}";
   return json;
 }
 
@@ -208,6 +223,7 @@ void handleCommand(const String& raw) {
   else if (verb == "respond") {
     if (payload == "yes") {
       stopScroll();
+      urgentMsg = "";
       resumeRemaining = (sessionEnd > millis()) ? (sessionEnd - millis()) : 0;
       setLock(true);
       state = RESUME;
@@ -235,17 +251,29 @@ void handleCommand(const String& raw) {
       setLock(false);
       state = LOCKED;
       urgentMsg = "";
+      lcd.begin(16, 2);
       refreshCountdown();
     } else {
       state = DONE;
+      setLock(true);
+      lcd.begin(16, 2);
       lcdShow("  Session End ", "  Good work!  ");
     }
+  }
+  else if (verb == "end") {
+    stopScroll();
+    state = DONE;
+    urgentMsg = "";
+    setLock(true);                               // unlock the box
+    lcd.begin(16, 2);
+    lcdShow("  Session End ", "  Good work!  ");
   }
   else if (verb == "pause") {
     int secs = payload.toInt();
     resumeRemaining = (secs > 0)
       ? (unsigned long)secs * 1000UL
       : ((sessionEnd > millis()) ? (sessionEnd - millis()) : 0);
+    urgentMsg = "";
     setLock(true);                            // unlock the box
     state = RESUME;
     String remStr = formatTime(resumeRemaining / 1000);
@@ -278,7 +306,7 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *pChar) override {
     String value = pChar->getValue().c_str();
     if (value.length() > 0) {
-      handleCommand(value);
+      enqueueCommand(value);
     }
   }
 };
@@ -336,6 +364,12 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
+  // ── Drain command queue (runs on main task — safe for LCD/servo) ──
+  if (cmdPending) {
+    handleCommand(String(cmdBuffer));
+    cmdPending = false;
+  }
+
   // Timer expired → auto unlock
   if (state == LOCKED && now >= sessionEnd) {
     setLock(true);
@@ -354,6 +388,7 @@ void loop() {
     if (digitalRead(YES_PIN) == LOW) {
       lastDebounce = now;
       stopScroll();
+      urgentMsg = "";
       resumeRemaining = (sessionEnd > millis()) ? (sessionEnd - millis()) : 0;
       setLock(true);
       state = RESUME;
