@@ -1,9 +1,10 @@
 import MODEL from "../../../model.json";
 
-/**
- * JS port of the trained TF-IDF + Logistic Regression classifier.
- * Reads vocabulary, idf, coef, intercept, and ngram_range from model.json.
- */
+const API_URL = "https://nolmonone-pawse-classifier.hf.space/classify";
+const TIMEOUT_MS = 3000;
+
+// ─── Local TF-IDF classifier (offline fallback) ───────────────────────────────
+
 export function tfidfClassify(text) {
   const { vocabulary, idf, coef, intercept, ngram_range } = MODEL;
   const tokens = text.toLowerCase().match(/\b\w+\b/g) || [];
@@ -31,13 +32,31 @@ export function tfidfClassify(text) {
   return score > 0 ? "urgent" : "non_urgent";
 }
 
-/**
- * Builds a flat lowercase keyword list from trusted_contacts rows.
- * Each contact has a name + optional comma-separated note.
- *
- * e.g. [{ name: "Mom", note: "mama, home" }]
- *   → ["mom", "mama", "home"]
- */
+// ─── MobileBERT API call ──────────────────────────────────────────────────────
+
+async function classifyWithAPI(text) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const data = await res.json();
+    return data; // { label, confidence }
+  } catch (err) {
+    clearTimeout(timeout);
+    throw err;
+  }
+}
+
+// ─── Trusted contact helpers ──────────────────────────────────────────────────
+
 export function buildTrustedKeywords(contacts = []) {
   return contacts.flatMap((c) => {
     const base = [c.name.trim().toLowerCase()];
@@ -51,20 +70,28 @@ export function buildTrustedKeywords(contacts = []) {
   });
 }
 
-/**
- * Main classify function — checks trusted contacts FIRST, then falls back to ML.
- *
- * @param {string}   text            — notification text
- * @param {string[]} trustedKeywords — from buildTrustedKeywords()
- * @returns {"urgent" | "non_urgent"}
- */
-export function classifyWithContacts(text, trustedKeywords = []) {
+// ─── Main classify (async) ────────────────────────────────────────────────────
+// 1. Trusted contact match → always urgent, skip ML
+// 2. Try MobileBERT API → trust its decision directly
+// 3. If API fails (offline/timeout) → fall back to TF-IDF
+
+export async function classifyWithContacts(text, trustedKeywords = []) {
   const lower = text.toLowerCase();
 
-  // Trusted contact match → always urgent, bypass ML entirely
+  // Trusted contact → always urgent
   const isTrusted = trustedKeywords.some((kw) => lower.includes(kw));
   if (isTrusted) return "urgent";
 
-  // Fall back to TF-IDF model
-  return tfidfClassify(text);
+  // Try MobileBERT API
+  try {
+    const { label, confidence } = await classifyWithAPI(text);
+    console.log(
+      `[classifier] MobileBERT → ${label} (${(confidence * 100).toFixed(1)}%)`,
+    );
+    return label;
+  } catch (err) {
+    // Offline or server down → fall back to TF-IDF
+    console.log(`[classifier] TF-IDF fallback (${err.message})`);
+    return tfidfClassify(text);
+  }
 }

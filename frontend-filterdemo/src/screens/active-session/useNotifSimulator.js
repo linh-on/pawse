@@ -29,7 +29,9 @@ const notifEmitter =
  * Fallback (iOS / permission denied / native module missing):
  *   - Behaves exactly like the original sim with the NOTIFICATION_POOL
  *
- * API surface is identical to the old hook so no other files need changes.
+ * classifyWithContacts is now async:
+ *   - Tries MobileBERT API first (3s timeout)
+ *   - Falls back to local TF-IDF if offline or API fails
  */
 export function useNotifSimulator({
   onNotificationClassified,
@@ -118,9 +120,13 @@ export function useNotifSimulator({
     return () => clearInterval(intervalRef.current);
   }, [isRunning, mode]);
 
-  // ── Core: classify + route a notification ───────────────────────────────
-  function handleIncoming(text, trueLabel) {
-    const predicted = classifyWithContacts(text, trustedKeywordsRef.current);
+  // ── Core: classify + route a notification (now async) ───────────────────
+  async function handleIncoming(text, trueLabel) {
+    // classifyWithContacts tries MobileBERT API first, falls back to TF-IDF
+    const predicted = await classifyWithContacts(
+      text,
+      trustedKeywordsRef.current,
+    );
     const isTrusted = trustedKeywordsRef.current.some((kw) =>
       text.toLowerCase().includes(kw),
     );
