@@ -3,6 +3,9 @@ import MODEL from "../../../model.json";
 const API_URL = "https://nolmonone-pawse-classifier.hf.space/classify";
 const TIMEOUT_MS = 3000;
 
+// If model says non_urgent but confidence is below this → treat as urgent
+const NON_URGENT_CONFIDENCE_THRESHOLD = 0.85;
+
 // ─── Local TF-IDF classifier (offline fallback) ───────────────────────────────
 
 export function tfidfClassify(text) {
@@ -72,7 +75,8 @@ export function buildTrustedKeywords(contacts = []) {
 
 // ─── Main classify (async) ────────────────────────────────────────────────────
 // 1. Trusted contact match → always urgent, skip ML
-// 2. Try MobileBERT API → trust its decision directly
+// 2. Try MobileBERT API
+//    - If non_urgent but confidence < threshold → treat as urgent
 // 3. If API fails (offline/timeout) → fall back to TF-IDF
 
 export async function classifyWithContacts(text, trustedKeywords = []) {
@@ -85,6 +89,18 @@ export async function classifyWithContacts(text, trustedKeywords = []) {
   // Try MobileBERT API
   try {
     const { label, confidence } = await classifyWithAPI(text);
+
+    // Not confident enough that it's safe → treat as urgent
+    if (
+      label === "non_urgent" &&
+      confidence < NON_URGENT_CONFIDENCE_THRESHOLD
+    ) {
+      console.log(
+        `[classifier] MobileBERT unsure (${(confidence * 100).toFixed(1)}%) → urgent`,
+      );
+      return "urgent";
+    }
+
     console.log(
       `[classifier] MobileBERT → ${label} (${(confidence * 100).toFixed(1)}%)`,
     );
