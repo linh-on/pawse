@@ -273,8 +273,8 @@ const HomeScreen = () => {
     if (countdown === null) return;
 
     if (countdown <= 0) {
-      setCountdown(null);
       navigation.navigate("ActiveSession", { durationMinutes: minutes });
+      setCountdown(null);
       return;
     }
 

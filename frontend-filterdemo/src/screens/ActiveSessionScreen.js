@@ -28,19 +28,14 @@ import UrgentModal from "./active-session/UrgentModal";
 
 const cleanLCDText = (text = "") => {
   return String(text)
-    .replace(/[^\x20-\x7E]/g, "") // remove emojis / special LCD-breaking chars
+    .replace(/[^\x20-\x7E]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 };
 
 const makeLCDUrgentText = (entry) => {
-  // Later, when you add real AI, put the AI result in entry.aiSummary.
-  // For now, this still works with the current notification text.
   const raw =
     entry?.aiSummary || entry?.summary || entry?.text || "Urgent message";
-
-  // Send more than 16 characters so the ESP32 LCD can scroll it,
-  // but keep it short enough to avoid BLE/message-size problems.
   return cleanLCDText(raw).slice(0, 80);
 };
 
@@ -84,11 +79,18 @@ const ActiveSessionScreen = () => {
   const dbSessionIdRef = useRef(existingSessionId ?? null);
   const sessionFinishedRef = useRef(false);
   const hasNavigatedRef = useRef(false);
-
-  // Track whether the session started before the box was connected.
-  // If true, we skip sending start/resume when the box connects late
-  // to avoid LCD scramble and timer desync.
   const sessionStartedWithoutBoxRef = useRef(!connected);
+
+  // Fix: track whether the box has transitioned OUT of DONE since mount.
+  // If the box was already DONE when we arrived (leftover from last session),
+  // we must not treat that as "current session finished".
+  const boxHasBeenActiveRef = useRef(boxState !== "DONE");
+
+  useEffect(() => {
+    if (boxState !== "DONE") {
+      boxHasBeenActiveRef.current = true;
+    }
+  }, [boxState]);
 
   const saveNotificationLog = async (entry) => {
     if (!dbSessionIdRef.current) return;
@@ -113,6 +115,11 @@ const ActiveSessionScreen = () => {
     },
     userId: user?.id,
   });
+
+  // Auto-start listening when in real mode
+  useEffect(() => {
+    if (sim.mode === "real") sim.start();
+  }, [sim.mode]);
 
   useEffect(() => {
     let mounted = true;
@@ -162,9 +169,6 @@ const ActiveSessionScreen = () => {
   useEffect(() => {
     if (!connected || sessionStartedRef.current) return;
 
-    // Box connected after the session timer was already running on the app.
-    // Don't send start — it causes LCD scramble and timer desync.
-    // Mark as started so this effect doesn't fire again, but take no action.
     if (sessionStartedWithoutBoxRef.current) {
       sessionStartedRef.current = true;
       return;
@@ -216,7 +220,6 @@ const ActiveSessionScreen = () => {
       ? Math.min(localRemaining, boxRemainingSecs)
       : localRemaining;
 
-  // Define goToGracePeriod before the prevBoxState effect that references it
   const goToGracePeriod = useCallback(async () => {
     const pausedSeconds = Math.max(0, Math.floor(remainingSecs));
     if (connected) {
@@ -230,7 +233,6 @@ const ActiveSessionScreen = () => {
     });
   }, [connected, remainingSecs, actions, sim, navigation, durationMinutes]);
 
-  // Auto-dismiss urgent modal when hardware resolves it via physical buttons
   const prevBoxState = useRef(boxState);
   useEffect(() => {
     if (
@@ -239,14 +241,12 @@ const ActiveSessionScreen = () => {
       boxState !== "URGENT"
     ) {
       if (boxState === "RESUME") {
-        // Physical YES pressed on box — dismiss modal and go to grace period
         sim.dismissModal();
         if (!hasNavigatedRef.current) {
           hasNavigatedRef.current = true;
           goToGracePeriod();
         }
       } else if (boxState === "LOCKED") {
-        // Physical NO pressed on box — just dismiss the modal
         sim.dismissModal();
       }
     }
@@ -258,7 +258,10 @@ const ActiveSessionScreen = () => {
 
   useEffect(() => {
     const localTimerDone = remainingSecs <= 0;
-    const boxTimerDone = connected && boxState === "DONE";
+    // Only treat box DONE as session-complete if the box has been active
+    // during THIS session (guards against leftover DONE from previous session)
+    const boxTimerDone =
+      connected && boxState === "DONE" && boxHasBeenActiveRef.current;
 
     if ((localTimerDone || boxTimerDone) && !hasNavigatedRef.current) {
       hasNavigatedRef.current = true;
@@ -290,7 +293,6 @@ const ActiveSessionScreen = () => {
             Your phone is tucked away for a while.
           </Text>
 
-          {/* Box connection status indicator */}
           <View style={styles.boxIndicator}>
             <View
               style={[
@@ -312,7 +314,6 @@ const ActiveSessionScreen = () => {
             </Text>
           </View>
 
-          {/* Warning banner: session started without box */}
           {sessionStartedWithoutBoxRef.current && !connected && (
             <View style={styles.noBoxBanner}>
               <MaterialIcons
