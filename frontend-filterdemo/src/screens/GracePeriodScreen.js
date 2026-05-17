@@ -95,7 +95,7 @@ const GracePeriodScreen = () => {
       }
       navigation.replace("HomeScreen");
     }
-  }, [boxState]); // Only re-run when boxState changes — not on every render
+  }, [boxState]); // Only re-run when boxState changes
 
   useEffect(() => {
     async function fetchGracePeriod() {
@@ -116,11 +116,6 @@ const GracePeriodScreen = () => {
 
     fetchGracePeriod();
   }, [user?.id]);
-
-  // FIX: Removed the redundant pause command that fired on mount.
-  // ActiveSessionScreen.goToGracePeriod() already sends pause:<seconds>
-  // before navigating here. Sending it again caused an unnecessary servo
-  // movement which corrupted the LCD display.
 
   useEffect(() => {
     const id = setInterval(
@@ -148,10 +143,6 @@ const GracePeriodScreen = () => {
     ).start();
   }, [pulseAnim]);
 
-  // FIX: Don't send resume:yes here. ActiveSessionScreen will send it
-  // when it mounts via its own useEffect (the isResumingFromGrace path).
-  // Previously both screens sent resume:yes, causing a double servo move
-  // and LCD corruption (the "weird characters" bug).
   const resumeFocusTimer = () => {
     navigation.replace("ActiveSession", {
       durationMinutes,
@@ -171,8 +162,6 @@ const GracePeriodScreen = () => {
     hasLeftRef.current = true;
     setIsEnding(true);
 
-    // FIX: endSession() now sends a single "end" command.
-    // The firmware handles unlocking + LCD reset internally.
     if (connected) {
       await actions.endSession();
     }

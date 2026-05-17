@@ -37,5 +37,11 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders
-/ios
-/android
+frontend-filterdemo/ios
+frontend-filterdemo/android
+
+# secrets
+frontend-filterdemo/src/lib/supabase.js
+
+# local ML model
+mobilebert-pawse/

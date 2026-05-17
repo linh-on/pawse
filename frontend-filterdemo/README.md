@@ -1,116 +1,95 @@
-# 🐾 Pawse — Smart Focus Companion
+# Pawse — Mobile App
 
-A React Native / Expo app that demos a smart notification filter for focus sessions. Notifications are run through a TF-IDF + Logistic Regression classifier trained on ~300 labeled examples, then either allowed through (urgent) or suppressed (non-urgent) during a focus session.
+A React Native / Expo app for managing focus sessions. Users set a timer, lock their phone in the Pawse hardware box, and the app filters incoming notifications using an ML classifier. Urgent notifications surface immediately; non-urgent ones are suppressed until the session ends.
 
----
+
+## How the Classifier Works
+
+The app uses a two-tier classifier depending on connectivity.
+
+When online, notifications are sent to a fine-tuned MobileBERT model hosted on Hugging Face for higher accuracy inference.
+
+When offline, a TF-IDF + Logistic Regression model runs fully on-device using weights exported to `model.json`. The model was trained in Python with scikit-learn on labeled notification data and reimplemented in JavaScript so it requires zero network calls.
+
+Live demo: [Hugging Face Space](https://huggingface.co/spaces/nolmonone/pawse-classifier)
+
 
 ## Quick Start
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or newer)
-- npm (comes with Node)
-- [Expo Go](https://expo.dev/client) app on your phone, OR an Android/iOS simulator
-
-### Install & Run
+Prerequisites:
+- Node.js v18 or newer
+- Expo Go app on your phone, or an Android/iOS simulator
 
 ```bash
-git clone <repo-url>
 cd frontend-filterdemo
 npm install
 npx expo start
 ```
 
-Then either:
-- **Phone**: Scan the QR code in your terminal with the Expo Go app (Android) or the Camera app (iOS)
-- **Web**: Press `w` in the terminal to open in your browser
-- **Simulator**: Press `a` (Android) or `i` (iOS)
+Then either scan the QR code with Expo Go on Android, use the Camera app on iOS, or press `w` to open in browser.
 
-If your phone won't connect, try:
+If your phone cannot connect, run:
+
 ```bash
 npx expo start --tunnel
 ```
 
----
 
 ## Project Structure
 
 ```
 frontend-filterdemo/
-├── App.js              # App entry point — loads fonts & wraps navigator
-├── index.js            # Expo bootstrap file
-├── app.json            # Expo config (name, plugins, slug)
-├── model.json          # Trained classifier weights (TF-IDF + LR)
-├── package.json        # Dependencies
+├── App.js                        # App entry point, loads fonts and mounts navigator
+├── index.js                      # Expo bootstrap
+├── app.json                      # Expo config
+├── model.json                    # Exported TF-IDF + LR model weights for offline inference
+├── package.json                  # Dependencies
 └── src/
-    ├── theme.js        # Design system: colors, spacing, fonts, shadows
+    ├── theme.js                  # Design system: colors, spacing, fonts, shadows
     ├── components/
-    │   ├── Header.js              # Shared top bar (logo + profile avatar)
-    │   └── CircularProgress.js    # SVG progress ring used in active session
+    │   ├── Header.js             # Shared top bar
+    │   └── CircularProgress.js   # SVG progress ring for active session
+    ├── context/
+    │   └── PawseBoxContext.js    # Global state for hardware box connection
+    ├── hooks/
+    │   ├── usePawseBox.js        # Hook for Bluetooth box communication
+    │   └── usePawseBoxWifi.js    # Hook for WiFi box communication
+    ├── lib/
+    │   ├── AuthContext.js        # Authentication state and helpers
+    │   └── supabase.js           # Supabase client setup
     ├── navigation/
-    │   └── AppNavigator.js        # Routes: SignIn → Main tabs → Profile modal
+    │   └── AppNavigator.js       # Routes: SignIn, Main tabs, Profile modal
+    ├── utils/
+    │   └── responsive.js         # Responsive sizing utilities
     └── screens/
-        ├── SignInScreen.js        # Login screen (entry point)
-        ├── HomeScreen.js          # Set focus duration, prep checklist, start
-        ├── ActiveSessionScreen.js # Live session timer + notification demo
-        ├── StatsScreen.js         # Focus stats, weekly chart, rewards grid
-        ├── CalendarScreen.js      # Calendar sync settings + upcoming events
-        ├── SettingsScreen.js      # Plan, theme, audio, sign out
-        ├── ProfileScreen.js       # Edit name, birthday, email
-        └── MiscScreens.js         # FilterSettings, Overrides, CalendarSync
+        ├── active-session/
+        │   ├── classifier.js         # JS inference logic for on-device model
+        │   ├── FeedCard.js           # Suppressed notification card component
+        │   ├── notifications.js      # Notification data and simulation
+        │   ├── NotifPanel.js         # Notification feed panel
+        │   ├── UrgentModal.js        # Modal shown for urgent notifications
+        │   ├── useNotifSimulator.js  # Hook for simulating incoming notifications
+        │   └── utils.js              # Session helper utilities
+        ├── ActiveSessionScreen.js    # Live timer and notification filtering
+        ├── CalendarScreen.js         # Calendar sync settings
+        ├── GracePeriodScreen.js      # Grace period before session locks
+        ├── HomeScreen.js             # Set focus duration and start session
+        ├── MiscScreens.js            # Filter settings and overrides
+        ├── OverrideLogScreen.js      # Log of emergency overrides
+        ├── ProfileScreen.js          # Edit profile
+        ├── SchoolScreen.js           # School mode session management
+        ├── SettingsScreen.js         # App preferences and sign out
+        ├── SignInScreen.js           # Login screen
+        ├── StatsScreen.js            # Focus stats and weekly chart
+        └── SubscriptionScreen.js     # Subscription and plan management
 ```
-
----
-
-## Key Files
-
-| File | What it does |
-|------|--------------|
-| `App.js` | Loads custom Google Fonts (Nunito, DM Sans, Plus Jakarta Sans), then mounts the navigator. Shows a loading spinner until fonts are ready. |
-| `model.json` | Output of `train.py` from the classifier project. Contains the TF-IDF vocabulary, IDF weights, logistic regression coefficients, and intercept. |
-| `src/theme.js` | All colors, spacing, fonts, and shadow definitions. Change values here to update the entire app's look. |
-| `ActiveSessionScreen.js` | The core demo — runs notifications through `tfidfClassify()` (a JS port of the Python model) and either suppresses them or shows an urgent modal. |
-
----
-
-## How the Classifier Works
-
-The classifier is trained in Python (separate repo) using `scikit-learn`:
-1. **TF-IDF Vectorizer** with 1–2 word n-grams
-2. **Logistic Regression** with balanced class weights
-
-The trained model is exported to `model.json` and reimplemented in JavaScript inside `ActiveSessionScreen.js` so it runs on-device with zero network calls.
-
-Accuracy on test data: **~80%** with 300 training examples.
-
----
-
-## Demo Flow
-
-1. Open the app → Sign In screen → tap any button to enter
-2. Home screen → set focus duration (− / +) → tap **Start Session**
-3. On the active session screen, tap **▶** to start the notification simulation
-4. Watch as fake notifications roll in:
-   - **Urgent** → red modal pops up, blocks further notifications until dismissed
-   - **Non-urgent** → silently added to the suppressed feed below
-
----
-
-## Common Issues
-
-**"Plugin expo-font missing"** — Make sure `app.json` includes:
-```json
-{ "expo": { "plugins": ["expo-font"] } }
-```
-
-**App is blank on web** — Try opening in Chrome or Firefox (not Edge), and check the browser console for errors.
-
-**QR code won't connect on phone** — Run `npx expo start --tunnel` instead. Phone and laptop need internet but not the same WiFi.
-
----
 
 ## Tech Stack
 
-- **React Native** + **Expo** for the app
-- **React Navigation** (native-stack + bottom-tabs)
-- **MaterialIcons** from `@expo/vector-icons`
-- **scikit-learn** (Python) for training the classifier
+| Layer | Technology |
+|---|---|
+| App | React Native, Expo |
+| Navigation | React Navigation (native stack + bottom tabs) |
+| ML (online) | MobileBERT via Hugging Face |
+| ML (offline) | TF-IDF + Logistic Regression, exported to JSON |
+| Training | Python, scikit-learn |

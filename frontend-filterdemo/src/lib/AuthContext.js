@@ -1,8 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
 
-// Simple in-memory auth context (no persistence — sign-out happens on app restart).
-// For real auth, replace this with Supabase auth or AsyncStorage persistence.
-
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {

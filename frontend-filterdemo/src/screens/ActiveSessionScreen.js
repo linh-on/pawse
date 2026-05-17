@@ -1,4 +1,3 @@
-// ActiveSessionScreen.js
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
@@ -81,9 +80,6 @@ const ActiveSessionScreen = () => {
   const hasNavigatedRef = useRef(false);
   const sessionStartedWithoutBoxRef = useRef(!connected);
 
-  // Fix: track whether the box has transitioned OUT of DONE since mount.
-  // If the box was already DONE when we arrived (leftover from last session),
-  // we must not treat that as "current session finished".
   const boxHasBeenActiveRef = useRef(boxState !== "DONE");
 
   useEffect(() => {

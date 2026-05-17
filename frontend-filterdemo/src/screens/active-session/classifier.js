@@ -35,7 +35,7 @@ export function tfidfClassify(text) {
   return score > 0 ? "urgent" : "non_urgent";
 }
 
-// ─── MobileBERT API call ──────────────────────────────────────────────────────
+// ─── MobileBERT API call ─────
 
 async function classifyWithAPI(text) {
   const controller = new AbortController();
@@ -58,7 +58,7 @@ async function classifyWithAPI(text) {
   }
 }
 
-// ─── Trusted contact helpers ──────────────────────────────────────────────────
+// Trusted contact helpers
 
 export function buildTrustedKeywords(contacts = []) {
   return contacts.flatMap((c) => {
@@ -72,12 +72,6 @@ export function buildTrustedKeywords(contacts = []) {
     return [...base, ...extras];
   });
 }
-
-// ─── Main classify (async) ────────────────────────────────────────────────────
-// 1. Trusted contact match → always urgent, skip ML
-// 2. Try MobileBERT API
-//    - If non_urgent but confidence < threshold → treat as urgent
-// 3. If API fails (offline/timeout) → fall back to TF-IDF
 
 export async function classifyWithContacts(text, trustedKeywords = []) {
   const lower = text.toLowerCase();

@@ -1,30 +1,3 @@
-/*
- *  PawseBuddy — BLE version
- *  ESP32-DevKitV1 · Arduino IDE
- *
- *  Replaces the WiFi-AP + WebServer communication layer with BLE.
- *  All servo / LCD / button / state-machine logic is unchanged.
- *
- *  BLE design
- *  ──────────
- *  Service UUID:        "12345678-1234-1234-1234-123456789abc"
- *  STATUS  characteristic (Read + Notify):
- *        UUID "abcd0001-1234-1234-1234-123456789abc"
- *        Value = JSON string identical to old /status response
- *        Notified every ~1 s so the phone stays in sync.
- *
- *  COMMAND characteristic (Write):
- *        UUID "abcd0002-1234-1234-1234-123456789abc"
- *        Write a UTF-8 string in the format   VERB:payload
- *          start:30          → start 30-minute session
- *          urgent:Mom called → send urgent message
- *          respond:yes       → unlock (or respond:no to dismiss)
- *          resume:yes        → re-lock & continue (or resume:no to end)
- *
- *  Board:   "ESP32 Dev Module" in Arduino IDE
- *  Library: ESP32 BLE Arduino (bundled with the ESP32 board package)
- */
-
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -51,10 +24,6 @@ BLECharacteristic *pStatusChar = nullptr;
 BLECharacteristic *pCommandChar = nullptr;
 bool deviceConnected = false;
 
-// ── Command queue ───────────────────────────────────────
-// BLE onWrite runs in the BLE task, but LCD/servo must only be
-// touched from loop() (main task). Buffer one command at a time
-// using a plain char array — no String heap ops across tasks.
 #define CMD_BUF_SIZE 128
 volatile bool cmdPending = false;
 char cmdBuffer[CMD_BUF_SIZE];
@@ -151,15 +120,6 @@ void refreshCountdown() {
   lcdShow("Focus Session", formatTime(rem) + " LOCKED");
 }
 
-// ── Build the status JSON ─────────────────────────────────
-// FIX (v6): Dropped the always-empty "u":"" field.
-// Old format: {"s":"L","r":"30:47","u":""} = 28 bytes
-// New format: {"s":"L","r":"30:47"}        = 21 bytes
-//
-// With a default BLE MTU of 23 (20 bytes of ATT payload), the old 28-byte
-// JSON was truncated to 20 bytes with no closing '}', which silently blocked
-// all state updates on the phone. At 21 bytes the truncation is only 1 byte
-// and the regex fallback in parseStatus (usePawseBox.js v6) recovers it.
 String buildStatusJson() {
   long rem = 0;
   if (state == LOCKED || state == URGENT)
@@ -196,8 +156,6 @@ void notifyStatus() {
   pStatusChar->notify();
 }
 
-// ── Strip non-printable / non-ASCII chars before writing to LCD ──
-// Prevents emojis and special phone characters from showing as garbage.
 String cleanLCDText(String text) {
   String output = "";
   for (int i = 0; i < text.length(); i++) {
@@ -208,8 +166,6 @@ String cleanLCDText(String text) {
   return output;
 }
 
-// ── Command handler (replaces HTTP handlers) ─────────────
-// Format: "verb:payload"   e.g. "start:30" or "respond:yes"
 void handleCommand(const String& raw) {
   int colon = raw.indexOf(':');
   String verb    = (colon > 0) ? raw.substring(0, colon) : raw;

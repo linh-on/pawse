@@ -1,20 +1,7 @@
-/**
- * usePawseBox.js — BLE version (manual connect/disconnect)
- *
- * v6 fixes:
- *   - parseStatus no longer early-returns when the closing '}' is missing.
- *     With a 20-byte ATT payload the 21-byte JSON {"s":"L","r":"30:47"}
- *     is truncated to {"s":"L","r":"30:47" (no '}'), which previously hit
- *     the `lastBrace === -1` guard and returned before the regex fallback
- *     could run — so boxState NEVER updated and no sync effect ever fired.
- *     Now the regex fallback always gets a chance to extract state + remaining.
- */
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Platform, PermissionsAndroid } from "react-native";
 import { BleManager } from "react-native-ble-plx";
 
-// Must match the UUIDs in the ESP32 sketch
 const SERVICE_UUID = "12345678-1234-1234-1234-123456789abc";
 const STATUS_UUID = "abcd0001-1234-1234-1234-123456789abc";
 const COMMAND_UUID = "abcd0002-1234-1234-1234-123456789abc";
@@ -31,14 +18,12 @@ function normalizeSeconds(value) {
   return Math.max(0, Math.floor(n));
 }
 
-// Singleton BleManager
 let manager = null;
 function getManager() {
   if (!manager) manager = new BleManager();
   return manager;
 }
 
-// ── Map single-char state codes from the ESP32 to full names ──
 const STATE_MAP = {
   I: "IDLE",
   L: "LOCKED",
@@ -47,7 +32,6 @@ const STATE_MAP = {
   D: "DONE",
 };
 
-// ── Android permission helper ────────────────────────────
 async function requestAndroidPermissions() {
   if (Platform.OS !== "android") return true;
   const apiLevel = Platform.Version;
@@ -107,9 +91,6 @@ function b64Encode(str) {
   return result;
 }
 
-/**
- * usePawseBox() — BLE with manual connect/disconnect
- */
 export function usePawseBox() {
   const [connected, setConnected] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -121,20 +102,12 @@ export function usePawseBox() {
   const subRef = useRef(null);
   const cancelledRef = useRef(false);
 
-  // Track consecutive parse failures so we can log once instead of spamming
   const parseFailCount = useRef(0);
 
-  // ── Parse status from ESP32 ───────────────────────────
-  // Accepts both short-key (v6) and old long-key (v3/v4) JSON:
-  //   Short: {"s":"L","r":"30:47"}
-  //   Long:  {"state":"LOCKED","remaining":"30:47","urgentMsg":""}
+  //  Parse status from ESP32
+  //  Short: {"s":"L","r":"30:47"}
+  //  Long:  {"state":"LOCKED","remaining":"30:47","urgentMsg":""}
   //
-  // FIX (v6): When the BLE ATT payload is 20 bytes (MTU=23 minus 3 overhead)
-  // the 21-byte JSON {"s":"L","r":"30:47"} is delivered truncated as
-  // {"s":"L","r":"30:47" (no closing '}'). Previously we returned early when
-  // lastBrace === -1, so the regex fallback never ran and boxState froze.
-  // Now we skip the early return and let JSON.parse throw, which falls
-  // through to the regex path that can still extract "s" and "r" correctly.
   const parseStatus = useCallback((b64Value) => {
     let json;
     try {
@@ -143,24 +116,15 @@ export function usePawseBox() {
       return; // bad base64, skip silently
     }
 
-    // Trim trailing garbage (0xFF padding etc.) by finding last '}'.
-    // If no '}' is present (truncated by MTU), keep the raw string so the
-    // regex fallback below can still extract state + remaining.
     const lastBrace = json.lastIndexOf("}");
     if (lastBrace !== -1) {
       json = json.substring(0, lastBrace + 1);
     }
-    // Do NOT return early here — fall through to JSON.parse which will throw
-    // on a truncated string, then the catch block runs the regex fallback.
-
     let data;
     try {
       if (lastBrace === -1) throw new Error("no closing brace");
       data = JSON.parse(json);
     } catch (e) {
-      // JSON was truncated (MTU issue). Try to extract state + remaining
-      // with regex so boxState still updates — this is critical for sync
-      // between the physical buttons and the phone UI.
       const stateMatch = json.match(/"s"\s*:\s*"([A-Z])"/);
       if (stateMatch) {
         setState(STATE_MAP[stateMatch[1]] ?? stateMatch[1]);
@@ -180,10 +144,8 @@ export function usePawseBox() {
       return;
     }
 
-    // Successfully parsed — reset failure counter
     parseFailCount.current = 0;
 
-    // Handle short keys (v5/v6 firmware)
     if (data.s !== undefined) {
       setState(STATE_MAP[data.s] ?? data.s);
       setRemaining(data.r ?? "00:00");
@@ -191,13 +153,11 @@ export function usePawseBox() {
       return;
     }
 
-    // Handle long keys (v3/v4 firmware, backward compat)
     setState(data.state ?? null);
     setRemaining(data.remaining ?? "00:00");
     setUrgentMsg(data.urgentMsg ?? "");
   }, []);
 
-  // ── Write a command to the COMMAND characteristic ─────
   const writeCommand = useCallback(async (cmd) => {
     const device = deviceRef.current;
     if (!device) {
@@ -217,7 +177,6 @@ export function usePawseBox() {
     }
   }, []);
 
-  // ── Connect (called by user tapping the button) ───────
   const connect = useCallback(async () => {
     if (connected || scanning) return;
 
@@ -272,10 +231,6 @@ export function usePawseBox() {
             return;
           }
 
-          // Explicit MTU negotiation. The connect({ requestMTU }) option
-          // silently fails on many Android phones (especially Samsung Galaxy).
-          // Calling requestMTU() directly is more reliable and lets us await
-          // the actual negotiated value.
           if (Platform.OS === "android") {
             try {
               const mtuDevice = await d.requestMTU(512);
@@ -285,8 +240,6 @@ export function usePawseBox() {
                 "MTU negotiation failed, using default:",
                 mtuErr.message,
               );
-              // Continue anyway — parseStatus now handles truncated JSON via
-              // regex fallback even when MTU stays at the 23-byte default.
             }
           }
 
@@ -301,21 +254,17 @@ export function usePawseBox() {
           setConnected(true);
           console.log("BLE connected!");
 
-          // Subscribe to STATUS notifications
           subRef.current = d.monitorCharacteristicForService(
             SERVICE_UUID,
             STATUS_UUID,
             (err, char) => {
               if (err) {
-                // Don't log every notification error — they're common during
-                // disconnect and are handled by the onDisconnected callback.
                 return;
               }
               if (char?.value) parseStatus(char.value);
             },
           );
 
-          // Initial read
           try {
             const initial = await d.readCharacteristicForService(
               SERVICE_UUID,
@@ -326,7 +275,6 @@ export function usePawseBox() {
             console.warn("Initial status read failed:", readErr.message);
           }
 
-          // Handle unexpected disconnection
           d.onDisconnected(() => {
             console.log("BLE disconnected");
             setConnected(false);
@@ -357,7 +305,6 @@ export function usePawseBox() {
     }, 15000);
   }, [connected, scanning, parseStatus]);
 
-  // ── Disconnect (called by user tapping the button) ────
   const disconnect = useCallback(async () => {
     cancelledRef.current = true;
     const ble = getManager();
@@ -371,7 +318,6 @@ export function usePawseBox() {
       try {
         await deviceRef.current.cancelConnection();
       } catch (e) {
-        // Already disconnected, that's fine
       }
       deviceRef.current = null;
     }

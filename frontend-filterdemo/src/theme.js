@@ -141,27 +141,17 @@ export const typography = {
   },
 };
 
-// ─── Reusable patterns ────────────────────────────────────────────────────────
-// Spread these into local styles to share common shapes across files.
-//
-// Usage:
-//   const styles = StyleSheet.create({
-//     myCard: { ...patterns.card, gap: spacing.sm },
-//   });
-
 export const patterns = {
-  // Full-screen container — warm cream background
   screen: {
     flex: 1,
     backgroundColor: colors.surfaceContainerLow,
   },
-  // Alt screen background (active session uses background, not surfaceContainerLow)
+
   screenAlt: {
     flex: 1,
     backgroundColor: colors.background,
   },
 
-  // Big rounded card (used for sessionCard, demoSection, brainCard, statsCard, etc.)
   card: {
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii["3xl"],
@@ -169,7 +159,7 @@ export const patterns = {
     borderWidth: 1,
     borderColor: `${colors.orange}18`,
   },
-  // Larger card (Home session card, Profile cards)
+
   cardLg: {
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii["4xl"],
@@ -177,7 +167,7 @@ export const patterns = {
     borderWidth: 1,
     borderColor: `${colors.orange}18`,
   },
-  // Smaller card / row item
+
   cardSm: {
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radii["2xl"],
@@ -186,7 +176,6 @@ export const patterns = {
     borderColor: `${colors.orange}18`,
   },
 
-  // A horizontal "row" item (used in lists — settings, smart filter, calendar events)
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -198,7 +187,6 @@ export const patterns = {
     borderColor: `${colors.orange}18`,
   },
 
-  // Circular icon container (used inside rows, headers, profile)
   circleIcon: {
     width: 36,
     height: 36,
@@ -207,7 +195,7 @@ export const patterns = {
     justifyContent: "center",
     backgroundColor: `${colors.primaryContainer}33`,
   },
-  // Small circle (avatars, badges, dots)
+
   circleIconSm: {
     width: 24,
     height: 24,
@@ -216,20 +204,17 @@ export const patterns = {
     justifyContent: "center",
   },
 
-  // Centered title block (Deep Focus, Calendar Sync, etc.)
   titleBlock: {
     alignItems: "center",
     gap: 6,
   },
 
-  // A space-between row (used everywhere for headers, toggle rows)
   rowBetween: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
 
-  // Small badge (chips, status tags)
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -237,7 +222,6 @@ export const patterns = {
     alignSelf: "flex-start",
   },
 
-  // Primary button (Start Session, Sign In, Save Changes)
   buttonPrimary: {
     backgroundColor: colors.primaryContainer,
     borderRadius: radii["3xl"],
@@ -247,7 +231,7 @@ export const patterns = {
     flexDirection: "row",
     gap: spacing.sm,
   },
-  // Secondary button (Manage Connection, neutral actions)
+
   buttonSecondary: {
     backgroundColor: colors.surfaceContainer,
     borderRadius: radii["2xl"],
@@ -258,7 +242,6 @@ export const patterns = {
     gap: spacing.sm,
   },
 
-  // Sub-header for sections
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -266,7 +249,6 @@ export const patterns = {
     marginBottom: 4,
   },
 
-  // Page-level header bar (Smart Filter, Profile)
   pageHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -278,7 +260,6 @@ export const patterns = {
     borderBottomColor: `${colors.orange}22`,
   },
 
-  // Standard scroll container with horizontal padding
   scrollContent: {
     paddingHorizontal: spacing.containerPadding,
     paddingTop: spacing.md,
@@ -286,9 +267,6 @@ export const patterns = {
   },
 };
 
-// ─── Shorthand helpers for tinting ───────────────────────────────────────────
-// Returns a hex with alpha suffix — equivalent to `${color}${alphaHex}`
-// Example: tint(colors.primary, 0.18) → '#87530030' (approximately)
 export const tint = (hex, alpha) => {
   const a = Math.round(alpha * 255)
     .toString(16)
