@@ -5,35 +5,33 @@
 #include <LiquidCrystal.h>
 #include <ESP32Servo.h>
 
+#include "session_core.h"
+
 const int LCD_RS = 19, LCD_EN = 18, LCD_D4 = 23, LCD_D5 = 22, LCD_D6 = 21, LCD_D7 = 5;
 const int SERVO_PIN = 25;
-const int YES_PIN   = 32;
-const int NO_PIN    = 33;
+const int YES_PIN = 32;
+const int NO_PIN = 33;
 
-
-const int LOCKED_ANGLE   = 0;
+const int LOCKED_ANGLE = 0;
 const int UNLOCKED_ANGLE = 90;
 
-
-#define SERVICE_UUID  "12345678-1234-1234-1234-123456789abc"
-#define STATUS_CHAR_UUID  "abcd0001-1234-1234-1234-123456789abc"
+#define SERVICE_UUID "12345678-1234-1234-1234-123456789abc"
+#define STATUS_CHAR_UUID "abcd0001-1234-1234-1234-123456789abc"
 #define COMMAND_CHAR_UUID "abcd0002-1234-1234-1234-123456789abc"
-
 
 const int LCD_COLS = 16;
 const int LCD_ROWS = 2;
-const unsigned long SCROLL_DELAY_MS         = 350;
+const unsigned long SCROLL_DELAY_MS = 350;
 const unsigned long SCROLL_INITIAL_PAUSE_MS = 1200;
 
-
-const size_t CMD_MAX_LEN   = 128;
-const int    CMD_QUEUE_LEN = 8;
+const size_t CMD_MAX_LEN = 128;
+const int CMD_QUEUE_LEN = 8;
 
 struct Command {
   char text[CMD_MAX_LEN];
 };
 
-class LockController {
+class LockController : public ILock {
 public:
   LockController(int pin, int lockedAngle, int unlockedAngle)
     : _pin(pin), _lockedAngle(lockedAngle), _unlockedAngle(unlockedAngle), _locked(false) {}
@@ -43,42 +41,42 @@ public:
     unlock();
   }
 
-  void lock()   { _servo.write(_lockedAngle);   _locked = true;  settle(); }
-  void unlock() { _servo.write(_unlockedAngle); _locked = false; settle(); }
+  void lock() override { _servo.write(_lockedAngle); _locked = true; settle(); }
+  void unlock() override { _servo.write(_unlockedAngle); _locked = false; settle(); }
 
-  bool isLocked() const { return _locked; }
+  bool isLocked() const override { return _locked; }
 
 private:
   void settle() { delay(500); }
 
   Servo _servo;
-  int   _pin;
-  int   _lockedAngle;
-  int   _unlockedAngle;
-  bool  _locked;
+  int _pin;
+  int _lockedAngle;
+  int _unlockedAngle;
+  bool _locked;
 };
 
-class DisplayController {
+class DisplayController : public IDisplay {
 public:
   DisplayController(int rs, int en, int d4, int d5, int d6, int d7)
     : _lcd(rs, en, d4, d5, d6, d7), _scrollPos(0), _lastScrollTime(0), _scrollActive(false) {}
 
   void begin() { _lcd.begin(LCD_COLS, LCD_ROWS); }
-  void reset() { _lcd.begin(LCD_COLS, LCD_ROWS); }
 
-  void show(String line1, String line2) {
-    while (line1.length() < LCD_COLS) line1 += " ";
-    while (line2.length() < LCD_COLS) line2 += " ";
-    _lcd.setCursor(0, 0); _lcd.print(line1.substring(0, LCD_COLS));
-    _lcd.setCursor(0, 1); _lcd.print(line2.substring(0, LCD_COLS));
+  void reset() override { _lcd.begin(LCD_COLS, LCD_ROWS); }
+
+  void show(const char* line1, const char* line2) override {
+    String a(line1);
+    String b(line2);
+    while (a.length() < LCD_COLS) a += " ";
+    while (b.length() < LCD_COLS) b += " ";
+    _lcd.setCursor(0, 0); _lcd.print(a.substring(0, LCD_COLS));
+    _lcd.setCursor(0, 1); _lcd.print(b.substring(0, LCD_COLS));
   }
 
-  void showCountdown(long remainingSecs) {
-    show("Focus Session", formatTime(remainingSecs) + " LOCKED");
-  }
-
-  void startScroll(const String& msg) {
-    _scrollPos      = 0;
+  void startScroll(const char* msg) override {
+    String text(msg);
+    _scrollPos = 0;
     _lastScrollTime = millis();
 
     _lcd.setCursor(0, 0);
@@ -87,17 +85,17 @@ public:
     _lcd.print("                ");
     _lcd.setCursor(0, 1);
 
-    if (msg.length() <= LCD_COLS) {
-      _lcd.print(msg);
+    if (text.length() <= LCD_COLS) {
+      _lcd.print(text);
       _scrollActive = false;
     } else {
-      _lcd.print(msg.substring(0, LCD_COLS));
-      _scrollText   = msg + "    ";
+      _lcd.print(text.substring(0, LCD_COLS));
+      _scrollText = text + "    ";
       _scrollActive = true;
     }
   }
 
-  void tickScroll() {
+  void tickScroll() override {
     if (!_scrollActive) return;
 
     unsigned long now = millis();
@@ -115,29 +113,20 @@ public:
     }
   }
 
-  void stopScroll() {
+  void stopScroll() override {
     _scrollActive = false;
-    _scrollPos    = 0;
-  }
-
-  static String formatTime(long secs) {
-    if (secs < 0) secs = 0;
-    char buf[8];
-    sprintf(buf, "%02ld:%02ld", secs / 60, secs % 60);
-    return String(buf);
+    _scrollPos = 0;
   }
 
 private:
   LiquidCrystal _lcd;
-  String        _scrollText;
-  int           _scrollPos;
+  String _scrollText;
+  int _scrollPos;
   unsigned long _lastScrollTime;
-  bool          _scrollActive;
+  bool _scrollActive;
 };
 
-
-
-class BleTransport {
+class BleTransport : public IStatusSink {
 public:
   BleTransport()
     : _statusChar(nullptr), _commandChar(nullptr),
@@ -158,7 +147,7 @@ public:
       STATUS_CHAR_UUID,
       BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
     );
-    _statusChar->addDescriptor(new BLE2902());   // required for notifications
+    _statusChar->addDescriptor(new BLE2902());
     _statusChar->setValue("{\"s\":\"I\",\"r\":\"00:00\"}");
 
     _commandChar = service->createCharacteristic(
@@ -181,13 +170,14 @@ public:
     return xQueueReceive(_queue, &out, 0) == pdTRUE;
   }
 
-  void sendStatus(const String& json) {
+  void send(const char* json) override {
     if (!_connected || !_statusChar) return;
-    _statusChar->setValue(json.c_str());
+    _statusChar->setValue(json);
     _statusChar->notify();
   }
 
   bool isConnected() const { return _connected; }
+
   bool consumeConnectionChange() {
     if (!_connectionChanged) return false;
     _connectionChanged = false;
@@ -201,12 +191,12 @@ private:
     Command cmd;
     text.toCharArray(cmd.text, CMD_MAX_LEN);
     if (xQueueSend(_queue, &cmd, 0) != pdTRUE) {
-      _dropped++;   
+      _dropped++;
     }
   }
 
   void setConnected(bool connected) {
-    _connected         = connected;
+    _connected = connected;
     _connectionChanged = true;
   }
 
@@ -220,7 +210,7 @@ private:
 
     void onDisconnect(BLEServer*) override {
       _owner->setConnected(false);
-      BLEDevice::startAdvertising();   // let the phone reconnect
+      BLEDevice::startAdvertising();
     }
 
   private:
@@ -242,15 +232,14 @@ private:
 
   BLECharacteristic* _statusChar;
   BLECharacteristic* _commandChar;
-  QueueHandle_t      _queue;
-  volatile bool      _connected;
-  volatile bool      _connectionChanged;
+  QueueHandle_t _queue;
+  volatile bool _connected;
+  volatile bool _connectionChanged;
   volatile unsigned long _dropped;
 };
 
-
-hw_timer_t*   secondTimer = nullptr;
-portMUX_TYPE  tickMux     = portMUX_INITIALIZER_UNLOCKED;
+hw_timer_t* secondTimer = nullptr;
+portMUX_TYPE tickMux = portMUX_INITIALIZER_UNLOCKED;
 volatile bool tickPending = false;
 
 void IRAM_ATTR onSecondTick() {
@@ -272,175 +261,33 @@ bool consumeTick() {
 
 void startSecondTimer() {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-  secondTimer = timerBegin(1000000);                 
+  secondTimer = timerBegin(1000000);
   timerAttachInterrupt(secondTimer, &onSecondTick);
-  timerAlarm(secondTimer, 1000000, true, 0);          
+  timerAlarm(secondTimer, 1000000, true, 0);
 #else
-  secondTimer = timerBegin(0, 80, true);              
+  secondTimer = timerBegin(0, 80, true);
   timerAttachInterrupt(secondTimer, &onSecondTick, true);
   timerAlarmWrite(secondTimer, 1000000, true);
   timerAlarmEnable(secondTimer);
 #endif
 }
 
-
-enum State { IDLE, LOCKED, URGENT, RESUME, DONE };
-
-LockController    lockBox(SERVO_PIN, LOCKED_ANGLE, UNLOCKED_ANGLE);
+LockController lockBox(SERVO_PIN, LOCKED_ANGLE, UNLOCKED_ANGLE);
 DisplayController display(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
-BleTransport      ble;
+BleTransport ble;
 
-State         state           = IDLE;
-unsigned long sessionEnd      = 0;
-unsigned long resumeRemaining = 0;
-String        urgentMsg       = "";
+SessionCore core(lockBox, display, ble);
 
-unsigned long lastDebounce = 0;
-const unsigned long DEBOUNCE_MS = 300;
-
-long remainingSecs() {
-  return max(0L, (long)(sessionEnd - millis()) / 1000);
+ButtonId readButton() {
+  if (digitalRead(YES_PIN) == LOW) return BUTTON_YES;
+  if (digitalRead(NO_PIN)  == LOW) return BUTTON_NO;
+  return BUTTON_NONE;
 }
-
-String buildStatusJson() {
-  long rem = 0;
-  if (state == LOCKED || state == URGENT)      rem = remainingSecs();
-  else if (state == RESUME)                    rem = (long)(resumeRemaining / 1000);
-
-  // Single-char state codes match STATE_MAP in usePawseBox.js
-  char s;
-  switch (state) {
-    case IDLE:   s = 'I'; break;
-    case LOCKED: s = 'L'; break;
-    case URGENT: s = 'U'; break;
-    case RESUME: s = 'R'; break;
-    default:     s = 'D'; break;
-  }
-
-  String json = "{\"s\":\"";
-  json += s;
-  json += "\",\"r\":\"";
-  json += DisplayController::formatTime(rem);
-  json += "\"}";
-  return json;
-}
-
-void notifyStatus() {
-  ble.sendStatus(buildStatusJson());
-}
-
-String cleanLCDText(const String& text) {
-  String output = "";
-  for (unsigned int i = 0; i < text.length(); i++) {
-    char c = text.charAt(i);
-    if (c >= 32 && c <= 126) output += c;
-  }
-  output.trim();
-  return output;
-}
-
-void showResumePrompt() {
-  String remStr = DisplayController::formatTime(resumeRemaining / 1000);
-  display.reset();
-  display.show("Continue? Y/N", remStr + " left");
-}
-
-void endSession() {
-  display.stopScroll();
-  urgentMsg = "";
-  state = DONE;
-  lockBox.unlock();
-  display.reset();
-  display.show("  Session End ", "  Good work!  ");
-}
-
-void handleCommand(const String& raw) {
-  int    colon   = raw.indexOf(':');
-  String verb    = (colon > 0) ? raw.substring(0, colon) : raw;
-  String payload = (colon > 0) ? raw.substring(colon + 1) : "";
-  verb.trim();
-  payload.trim();
-
-  Serial.println("BLE CMD -> " + verb + " | " + payload);
-
-  if (verb == "start") {
-    int minutes = payload.toInt();
-    if (minutes > 0) {
-      sessionEnd = millis() + (unsigned long)minutes * 60000UL;
-      state      = LOCKED;
-      urgentMsg  = "";
-      lockBox.lock();
-      display.reset();
-      display.showCountdown(remainingSecs());
-    }
-  }
-  else if (verb == "urgent" && state == LOCKED) {
-    urgentMsg = cleanLCDText(payload).substring(0, 80);
-    state     = URGENT;
-    display.startScroll(urgentMsg);
-  }
-  else if (verb == "respond") {
-    display.stopScroll();
-    urgentMsg = "";
-    if (payload == "yes") {
-      resumeRemaining = (sessionEnd > millis()) ? (sessionEnd - millis()) : 0;
-      lockBox.unlock();
-      state = RESUME;
-      showResumePrompt();
-    } else {
-      state = LOCKED;
-      display.showCountdown(remainingSecs());
-    }
-  }
-  else if (verb == "resume") {
-    // payload may be "yes" or "yes:1823" (seconds from the app)
-    if (payload.startsWith("yes")) {
-      int secondColon = payload.indexOf(':');
-      if (secondColon > 0) {
-        unsigned long appSecs = payload.substring(secondColon + 1).toInt();
-        if (appSecs > 0) resumeRemaining = appSecs * 1000UL;
-      }
-      sessionEnd = millis() + resumeRemaining;
-      urgentMsg  = "";
-      lockBox.lock();
-      state = LOCKED;
-      display.reset();
-      display.showCountdown(remainingSecs());
-    } else {
-      endSession();
-    }
-  }
-  else if (verb == "end") {
-    endSession();
-  }
-  else if (verb == "pause") {
-    int secs = payload.toInt();
-    resumeRemaining = (secs > 0)
-      ? (unsigned long)secs * 1000UL
-      : ((sessionEnd > millis()) ? (sessionEnd - millis()) : 0);
-    urgentMsg = "";
-    lockBox.unlock();
-    state = RESUME;
-    showResumePrompt();
-  }
-
-  notifyStatus();   // push new status after any command
-}
-
-int readButton(unsigned long now) {
-  if (now - lastDebounce <= DEBOUNCE_MS) return -1;
-
-  if (digitalRead(YES_PIN) == LOW) { lastDebounce = now; return YES_PIN; }
-  if (digitalRead(NO_PIN)  == LOW) { lastDebounce = now; return NO_PIN;  }
-  return -1;
-}
-
-
 
 void setup() {
   Serial.begin(115200);
 
-  lockBox.begin();     // starts unlocked
+  lockBox.begin();
 
   pinMode(YES_PIN, INPUT_PULLUP);
   pinMode(NO_PIN,  INPUT_PULLUP);
@@ -451,6 +298,7 @@ void setup() {
 
   ble.begin("PawseBuddy");
   startSecondTimer();
+  core.begin();
 
   Serial.println("BLE advertising as 'PawseBuddy'");
   display.show(" PawseBuddy   ", "Waiting for BLE");
@@ -461,70 +309,20 @@ void loop() {
 
   Command cmd;
   while (ble.pollCommand(cmd)) {
-    handleCommand(String(cmd.text));
+    Serial.print("BLE CMD -> ");
+    Serial.println(cmd.text);
+    core.handleCommand(cmd.text, millis());
   }
 
   if (ble.consumeConnectionChange()) {
-    if (ble.isConnected()) {
-      Serial.println("BLE: Phone connected");
-      if (state == IDLE || state == DONE)
-        display.show(" PawseBuddy   ", " Phone linked  ");
-    } else {
-      Serial.println("BLE: Phone disconnected");
-      if (state == IDLE || state == DONE)
-        display.show(" PawseBuddy   ", "Waiting for BLE");
-    }
+    Serial.println(ble.isConnected() ? "BLE: Phone connected" : "BLE: Phone disconnected");
+    core.onConnectionChange(ble.isConnected());
   }
 
-  if (state == LOCKED && now >= sessionEnd) {
-    lockBox.unlock();
-    state = DONE;
-    display.show("  Times Up!   ", "  Unlocked!   ");
-    notifyStatus();
-  }
-
-  if (state == URGENT) {
-    display.tickScroll();
-  }
-
-  if (state == URGENT || state == RESUME) {
-    int pressed = readButton(now);
-
-    if (state == URGENT && pressed == YES_PIN) {
-      display.stopScroll();
-      urgentMsg = "";
-      resumeRemaining = (sessionEnd > millis()) ? (sessionEnd - millis()) : 0;
-      lockBox.unlock();
-      state = RESUME;
-      showResumePrompt();
-      notifyStatus();
-    }
-    else if (state == URGENT && pressed == NO_PIN) {
-      display.stopScroll();
-      urgentMsg = "";
-      state = LOCKED;
-      display.showCountdown(remainingSecs());
-      notifyStatus();
-    }
-    else if (state == RESUME && pressed == YES_PIN) {
-      sessionEnd = millis() + resumeRemaining;
-      urgentMsg  = "";
-      lockBox.lock();
-      state = LOCKED;
-      display.showCountdown(remainingSecs());
-      notifyStatus();
-    }
-    else if (state == RESUME && pressed == NO_PIN) {
-      state = DONE;
-      display.show("  Session End ", "  Good work!  ");
-      notifyStatus();
-    }
-  }
+  core.update(now);
+  core.onButton(readButton(), now);
 
   if (consumeTick()) {
-    if (state == LOCKED) {
-      display.showCountdown(remainingSecs());
-    }
-    notifyStatus();
+    core.onSecondTick(now);
   }
 }
