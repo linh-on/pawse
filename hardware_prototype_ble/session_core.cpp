@@ -70,7 +70,8 @@ int32_t SessionCore::remainingSecs(uint32_t now) const {
 
 void SessionCore::formatTime(int32_t secs, char* out) {
   if (secs < 0) secs = 0;
-  sprintf(out, "%02ld:%02ld", (long)(secs / 60), (long)(secs % 60));
+  if (secs > MAX_DISPLAY_SECS) secs = MAX_DISPLAY_SECS;
+  snprintf(out, TIME_STR_LEN, "%02ld:%02ld", (long)(secs / 60), (long)(secs % 60));
 }
 
 void SessionCore::sanitizeLcdText(const char* in, char* out, size_t outLen) {
@@ -107,7 +108,7 @@ void SessionCore::buildStatusJson(char* out, size_t outLen, uint32_t now) const 
     default: code = 'D'; break;
   }
 
-  char timeStr[8];
+  char timeStr[TIME_STR_LEN];
   formatTime(rem, timeStr);
   snprintf(out, outLen, "{\"s\":\"%c\",\"r\":\"%s\"}", code, timeStr);
 }
@@ -119,7 +120,7 @@ void SessionCore::notifyStatus(uint32_t now) {
 }
 
 void SessionCore::showCountdown(uint32_t now) {
-  char timeStr[8];
+  char timeStr[TIME_STR_LEN];
   formatTime(remainingSecs(now), timeStr);
 
   char line2[24];
@@ -128,7 +129,7 @@ void SessionCore::showCountdown(uint32_t now) {
 }
 
 void SessionCore::showResumePrompt() {
-  char timeStr[8];
+  char timeStr[TIME_STR_LEN];
   formatTime((int32_t)(_resumeRemaining / 1000), timeStr);
 
   char line2[24];
@@ -155,7 +156,7 @@ void SessionCore::handleCommand(const char* raw, uint32_t now) {
 
   if (strcmp(verb, "start") == 0) {
     int minutes = atoi(payload);
-    if (minutes > 0) {
+    if (minutes > 0 && minutes <= MAX_SESSION_MINUTES) {
       _sessionEnd = now + (uint32_t)minutes * 60000UL;
       _state = STATE_LOCKED;
       clearUrgent();
@@ -167,7 +168,7 @@ void SessionCore::handleCommand(const char* raw, uint32_t now) {
     sanitizeLcdText(payload, _urgentMsg, sizeof(_urgentMsg));
     _state = STATE_URGENT;
     _display.startScroll(_urgentMsg);
-  } else if (strcmp(verb, "respond") == 0) {
+  } else if (strcmp(verb, "respond") == 0 && _state == STATE_URGENT) {
     _display.stopScroll();
     clearUrgent();
     if (strcmp(payload, "yes") == 0) {
@@ -185,7 +186,9 @@ void SessionCore::handleCommand(const char* raw, uint32_t now) {
       const char* secondColon = strchr(payload, ':');
       if (secondColon != NULL && secondColon != payload) {
         long appSecs = atol(secondColon + 1);
-        if (appSecs > 0) _resumeRemaining = (uint32_t)appSecs * 1000UL;
+        if (appSecs > 0 && appSecs <= (long)MAX_SESSION_MINUTES * 60) {
+          _resumeRemaining = (uint32_t)appSecs * 1000UL;
+        }
       }
       _sessionEnd = now + _resumeRemaining;
       clearUrgent();
@@ -198,7 +201,8 @@ void SessionCore::handleCommand(const char* raw, uint32_t now) {
     }
   } else if (strcmp(verb, "end") == 0) {
     endSession();
-  } else if (strcmp(verb, "pause") == 0) {
+  } else if (strcmp(verb, "pause") == 0 &&
+             (_state == STATE_LOCKED || _state == STATE_URGENT)) {
     int secs = atoi(payload);
     _resumeRemaining = (secs > 0) ? (uint32_t)secs * 1000UL
                                 : ((_sessionEnd > now) ? (_sessionEnd - now) : 0);

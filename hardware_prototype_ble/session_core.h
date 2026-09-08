@@ -26,6 +26,9 @@ public:
   static const size_t VERB_MAX_LEN = 16;
   static const size_t PAYLOAD_MAX_LEN = 128;
   static const size_t STATUS_JSON_MAX_LEN = 40;
+  static const size_t TIME_STR_LEN = 8;
+  static const int MAX_SESSION_MINUTES = 1440;
+  static const int32_t MAX_DISPLAY_SECS = 599999;
 
   SessionCore(ILock& lock, IDisplay& display, IStatusSink& status);
 
