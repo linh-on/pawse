@@ -1,0 +1,25 @@
+name: firmware tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+        working-directory: test
+
+      - name: Build
+        run: cmake --build build
+        working-directory: test
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+        working-directory: test
